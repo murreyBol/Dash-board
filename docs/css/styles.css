@@ -394,3 +394,15 @@ header h1 {
         margin: 10% auto;
     }
 }
+
+/* Calendar today highlight */
+.calendar-day.today {
+    background: #0d7377;
+    color: white;
+    font-weight: bold;
+    border: 2px solid #14ffec;
+}
+
+.calendar-day.today:hover {
+    background: #0a5a5d;
+}

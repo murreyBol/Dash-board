@@ -146,6 +146,44 @@ const app = {
         calendar.close();
     },
 
+    // Overdue Modal
+    async showOverdue() {
+        try {
+            const overdueTasks = kanban.tasks.filter(task =>
+                task.priority === 'overdue' && task.status !== 'archived'
+            );
+            this.renderOverdue(overdueTasks);
+            document.getElementById('overdueModal').style.display = 'block';
+        } catch (error) {
+            console.error('Failed to load overdue tasks:', error);
+            alert('Ошибка загрузки просроченных задач');
+        }
+    },
+
+    closeOverdueModal() {
+        document.getElementById('overdueModal').style.display = 'none';
+    },
+
+    renderOverdue(tasks) {
+        const container = document.getElementById('overdueList');
+
+        if (tasks.length === 0) {
+            container.innerHTML = '<p style="color: #888; text-align: center;">Нет просроченных задач</p>';
+            return;
+        }
+
+        container.innerHTML = tasks.map(task => {
+            const assignee = task.assigned_to ? 'Назначена' : 'Не назначена';
+            return `
+                <div class="archive-item">
+                    <h3>${this.escapeHtml(task.title)}</h3>
+                    <p>${this.escapeHtml(task.description || 'Нет описания')}</p>
+                    <p style="margin-top: 8px;"><strong>Статус:</strong> ${assignee}</p>
+                </div>
+            `;
+        }).join('');
+    },
+
     // Archive Modal
     async showArchive() {
         try {

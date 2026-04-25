@@ -38,6 +38,7 @@
                 <span id="currentUser"></span>
                 <button onclick="app.showSettings()">⚙️ Настройки</button>
                 <button onclick="app.showCalendar()">📅 Календарь</button>
+                <button onclick="app.showOverdue()">⏰ Просрочка</button>
                 <button onclick="app.showArchive()">📦 Архив</button>
                 <button onclick="app.logout()">Выход</button>
             </div>
@@ -71,6 +72,14 @@
                     <div class="column-content" id="low-tasks"></div>
                 </div>
 
+                <div class="kanban-column" data-priority="overdue">
+                    <div class="column-header overdue">
+                        <h3>⏰ Просрочка</h3>
+                        <span class="task-count">0</span>
+                    </div>
+                    <div class="column-content" id="overdue-tasks"></div>
+                </div>
+
                 <div class="kanban-column" data-priority="future">
                     <div class="column-header future">
                         <h3>🔮 В будущем</h3>
@@ -93,6 +102,7 @@
                 <option value="urgent">Срочная</option>
                 <option value="medium">Средняя срочность</option>
                 <option value="low">Малая срочность</option>
+                <option value="overdue">Просрочка</option>
                 <option value="future">В будущем</option>
             </select>
             <button onclick="app.saveTask()">Сохранить</button>
@@ -156,6 +166,15 @@
             <span class="close" onclick="app.closeArchiveModal()">&times;</span>
             <h2>Архив задач</h2>
             <div id="archiveList"></div>
+        </div>
+    </div>
+
+    <!-- Overdue Modal -->
+    <div id="overdueModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="app.closeOverdueModal()">&times;</span>
+            <h2>⏰ Просроченные задачи</h2>
+            <div id="overdueList"></div>
         </div>
     </div>
 

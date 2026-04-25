@@ -1,7 +1,7 @@
 /* Kanban Board */
 .kanban-board {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 20px;
 }
 
@@ -34,6 +34,11 @@
 .column-header.low {
     background: rgba(52, 152, 219, 0.2);
     border-left: 4px solid #3498db;
+}
+
+.column-header.overdue {
+    background: rgba(192, 57, 43, 0.3);
+    border-left: 4px solid #c0392b;
 }
 
 .column-header.future {

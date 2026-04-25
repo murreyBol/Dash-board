@@ -49,13 +49,17 @@ const calendar = {
         }
 
         // Days
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${this.currentYear}-${String(this.currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const hasActivity = this.getSessionsForDate(dateStr).length > 0;
             const isSelected = this.selectedDate === dateStr;
+            const isToday = dateStr === todayStr;
 
             html += `
-                <div class="calendar-day ${hasActivity ? 'has-activity' : ''} ${isSelected ? 'active' : ''}"
+                <div class="calendar-day ${hasActivity ? 'has-activity' : ''} ${isSelected ? 'active' : ''} ${isToday ? 'today' : ''}"
                      onclick="calendar.selectDate('${dateStr}')">
                     ${day}
                 </div>

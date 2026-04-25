@@ -22,6 +22,7 @@ const kanban = {
             urgent: document.getElementById('urgent-tasks'),
             medium: document.getElementById('medium-tasks'),
             low: document.getElementById('low-tasks'),
+            overdue: document.getElementById('overdue-tasks'),
             future: document.getElementById('future-tasks')
         };
 
@@ -29,7 +30,7 @@ const kanban = {
         Object.values(columns).forEach(col => col.innerHTML = '');
 
         // Count tasks per column
-        const counts = { urgent: 0, medium: 0, low: 0, future: 0 };
+        const counts = { urgent: 0, medium: 0, low: 0, overdue: 0, future: 0 };
 
         // Render tasks
         this.tasks.forEach(task => {
