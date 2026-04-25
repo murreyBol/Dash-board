@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="manifest" href="manifest.json">
+    <title>Планировщик задач</title>
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230d7377' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>✓</text></svg>">
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        h1 { font-size: 1.4rem; margin-bottom: 16px; }
+        section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        section h2 { font-size: 0.95rem; margin: 0 0 12px 0; color: #0d7377; }
+        .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        input[type="text"] {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 14px;
+            border: 1px solid #333;
+            border-radius: 10px;
+            background: #0f3460;
+            color: #fff;
+            font-size: 16px;
+        }
+        input[type="text"]:focus { outline: none; border-color: #0d7377; }
+        button {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 10px;
+            background: #0d7377;
+            color: #fff;
+            cursor: pointer;
+            font-size: 15px;
+            -webkit-appearance: none;
+        }
+        button:hover { background: #0a5c5f; }
+        button:active { transform: scale(0.98); }
+        button.secondary { background: #555; }
+        button.secondary:hover { background: #666; }
+        button.danger { background: #a23; }
+        button.danger:hover { background: #b34; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        select {
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: #0f3460;
+            color: #fff;
+            border: 1px solid #333;
+            font-size: 15px;
+            min-width: 180px;
+            flex: 1;
+        }
+        .timer-display { font-size: 1.6rem; font-weight: bold; font-family: monospace; }
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #333;
+        }
+        .task-item:last-child { border-bottom: none; }
+        .task-item input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            cursor: pointer;
+            accent-color: #0d7377;
+        }
+        .task-item .text {
+            flex: 1;
+            font-size: 16px;
+            word-break: break-word;
+        }
+        .task-item .text.done {
+            text-decoration: line-through;
+            color: #888;
+        }
+        .time-list { color: #aaa; font-size: 14px; }
+        .time-list div { padding: 8px 0; border-bottom: 1px solid #333; }
+        .time-list div:last-child { border-bottom: none; }
+        .time-list .task-name { font-weight: 600; color: #0d7377; }
+        .time-list .task-info { font-size: 13px; color: #888; margin-top: 4px; }
+        .sync-panel {
+            background: #0f3460;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        .sync-panel input { margin: 8px 0; width: 100%; }
+        .sync-status { font-size: 12px; color: #0d7377; margin-top: 8px; }
+        .sync-status.error { color: #e66; }
+        .sync-toggle { font-size: 13px; color: #888; cursor: pointer; text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>Планировщик задач</h1>
+
+    <div class="sync-panel" id="syncPanel">
+        <div id="syncLoggedIn" style="display:none">
+            <strong>Синхронизация включена</strong>
+            <div style="font-size:13px; margin:6px 0; word-break:break-all;">Код: <strong id="syncCodeDisplay"></strong></div>
+            <div style="font-size:12px; color:#888;">Введите этот код на iPhone или другом устройстве</div>
+            <div class="sync-status" id="syncStatus">Синхронизировано</div>
+            <button class="secondary" id="syncDisconnect" style="margin-top:8px; font-size:12px;">Отключить синхронизацию</button>
+        </div>
+        <div id="syncLoggedOut">
+            <div id="syncEnter" style="display:none">
+                <input type="text" id="syncCodeInput" placeholder="Введите код синхронизации" maxlength="32">
+                <button id="syncConnect">Подключить</button>
+            </div>
+            <div id="syncCreate">
+                <button id="syncCreateBtn">Создать код и включить синхронизацию</button>
+            </div>
+            <span class="sync-toggle" id="syncToggle">Уже есть код? Войти</span>
+        </div>
+    </div>
+
+    <section>
+        <h2>Таймер</h2>
+        <div class="row">
+            <select id="taskSelect">
+                <option value="">Выберите задачу</option>
+            </select>
+            <span class="timer-display" id="timer">00:00:00</span>
+            <button id="startBtn">Старт</button>
+            <button id="stopBtn" disabled>Стоп</button>
+        </div>
+    </section>
+
+    <section>
+        <h2>Мои задачи</h2>
+        <div class="row">
+            <input type="text" id="newTask" placeholder="Новая задача..." maxlength="200">
+            <button id="addBtn">+ Добавить</button>
+        </div>
+        <div id="taskList"></div>
+    </section>
+
+    <section>
+        <h2>Время по задачам</h2>
+        <div class="time-list" id="timeList">Пока нет данных о времени</div>
+    </section>
+
+    <script>
+        const STORAGE_KEY = 'taskPlannerData';
+        const SYNC_CODE_KEY = 'taskPlannerSyncCode';
+        const MANTLE_URL = 'https://mantledb.sh/v2';
+        let tasks = [];
+        let timeTracking = {};
+        let timerRunning = false;
+        let currentTaskId = null;
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let timerStartTime = null;
+        let lastSavedTime = 0;
+        let syncCode = localStorage.getItem(SYNC_CODE_KEY);
+        let syncPollInterval = null;
+
+        function load() {
+            try {
+                const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+                tasks = data.tasks || [];
+                timeTracking = data.timeTracking || {};
+            } catch (e) {
+                tasks = [];
+                timeTracking = {};
+            }
+        }
+
+        function save(noSync) {
+            const data = { tasks, timeTracking };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            if (syncCode && !noSync) pushToCloud(data);
+        }
+
+        function getElapsedTimeForCurrentSession() {
+            if (!timerRunning || !timerStartTime) return 0;
+            return Math.floor((Date.now() - timerStartTime) / 1000);
+        }
+
+        async function pushToCloud(data) {
+            try {
+                const ns = 'tp_' + syncCode.replace(/[^a-zA-Z0-9_-]/g, '');
+                const res = await fetch(`${MANTLE_URL}/${ns}/data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) setSyncStatus('Синхронизировано');
+                else setSyncStatus('Ошибка отправки', true);
+            } catch (e) {
+                setSyncStatus('Нет сети', true);
+            }
+        }
+
+        async function pullFromCloud() {
+            if (!syncCode) return;
+            try {
+                const ns = 'tp_' + syncCode.replace(/[^a-zA-Z0-9_-]/g, '');
+                const res = await fetch(`${MANTLE_URL}/${ns}/data`);
+                if (res.ok) {
+                    const cloud = await res.json();
+                    mergeData(cloud);
+                    setSyncStatus('Синхронизировано');
+                }
+            } catch (e) {
+                setSyncStatus('Нет сети', true);
+            }
+        }
+
+        function mergeData(cloud) {
+            if (!cloud) return;
+            const taskMap = {};
+            (cloud.tasks || []).forEach(t => taskMap[t.id] = { ...t });
+            tasks.forEach(t => {
+                if (taskMap[t.id]) {
+                    taskMap[t.id].completed = taskMap[t.id].completed || t.completed;
+                    taskMap[t.id].text = t.text;
+                } else taskMap[t.id] = { ...t };
+            });
+            tasks = Object.values(taskMap);
+            const allKeys = new Set([...Object.keys(cloud.timeTracking || {}), ...Object.keys(timeTracking)]);
+            const tt = {};
+            allKeys.forEach(k => {
+                tt[k] = Math.max(cloud.timeTracking?.[k] || 0, timeTracking[k] || 0);
+            });
+            timeTracking = tt;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, timeTracking }));
+        }
+
+        function setSyncStatus(msg, err) {
+            const el = document.getElementById('syncStatus');
+            if (el) {
+                el.textContent = msg;
+                el.className = 'sync-status' + (err ? ' error' : '');
+            }
+        }
+
+        function formatTime(sec) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        function formatDuration(sec) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            if (h > 0) return `${h} ч ${m} мин`;
+            if (m > 0) return `${m} мин ${s} сек`;
+            return `${s} сек`;
+        }
+
+        function renderTasks() {
+            const list = document.getElementById('taskList');
+            const select = document.getElementById('taskSelect');
+            list.innerHTML = '';
+            select.innerHTML = '<option value="">Выберите задачу</option>';
+
+            tasks.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'task-item';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = t.completed;
+                cb.onchange = () => { t.completed = !t.completed; save(); render(); };
+                const span = document.createElement('span');
+                span.className = 'text' + (t.completed ? ' done' : '');
+                span.textContent = t.text;
+                const del = document.createElement('button');
+                del.className = 'danger';
+                del.textContent = '✕';
+                del.onclick = () => {
+                    tasks = tasks.filter(x => x.id !== t.id);
+                    if (currentTaskId === t.id) stopTimer();
+                    save();
+                    render();
+                };
+                div.append(cb, span, del);
+                list.appendChild(div);
+                select.appendChild(new Option(t.text, t.id));
+            });
+        }
+
+        function renderTimeList() {
+            const el = document.getElementById('timeList');
+            const entries = Object.entries(timeTracking)
+                .map(([id, data]) => ({
+                    id,
+                    totalTime: typeof data === 'number' ? data : (data.total || 0),
+                    sessionDetails: typeof data === 'object' && data.sessionDetails ? data.sessionDetails : []
+                }))
+                .sort((a, b) => b.totalTime - a.totalTime);
+            
+            if (entries.length === 0) {
+                el.textContent = 'Пока нет данных о времени';
+                return;
+            }
+            
+            const names = Object.fromEntries(tasks.map(t => [t.id, t.text]));
+            el.innerHTML = entries.map(entry => {
+                const taskName = escapeHtml(names[entry.id] || '(удалённая)');
+                const totalDuration = formatDuration(entry.totalTime);
+                
+                let sessionsList = '';
+                if (entry.sessionDetails && entry.sessionDetails.length > 0) {
+                    sessionsList = '<div style="margin-top: 6px; padding-left: 20px; font-size: 12px; color: #666;">';
+                    entry.sessionDetails.forEach(session => {
+                        const date = new Date(session.date).toLocaleDateString('ru-RU');
+                        const duration = formatDuration(session.seconds);
+                        sessionsList += `<div>• ${date}: ${duration}</div>`;
+                    });
+                    sessionsList += '</div>';
+                }
+                
+                return `<div><div class="task-name">• ${taskName}</div><div class="task-info">Всего: ${totalDuration}</div>${sessionsList}</div>`;
+            }).join('');
+        }
+
+        function escapeHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function render() {
+            renderTasks();
+            renderTimeList();
+        }
+
+        function updateTimerDisplay() {
+            const elapsedInSession = getElapsedTimeForCurrentSession();
+            document.getElementById('timer').textContent = formatTime(elapsedInSession);
+        }
+
+        function startTimer() {
+            const sel = document.getElementById('taskSelect');
+            currentTaskId = sel.value;
+            if (!currentTaskId || timerRunning) return;
+            timerRunning = true;
+            timerStartTime = Date.now();
+            lastSavedTime = 0;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            timerInterval = setInterval(updateTimerDisplay, 100);
+            updateTimerDisplay();
+        }
+
+        function stopTimer() {
+            if (!timerRunning) return;
+            timerRunning = false;
+            clearInterval(timerInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            if (currentTaskId && timerStartTime) {
+                const elapsedSeconds = Math.floor((Date.now() - timerStartTime) / 1000);
+                if (elapsedSeconds > 0) {
+                    const today = new Date().toISOString().split('T')[0];
+                    
+                    if (typeof timeTracking[currentTaskId] === 'number') {
+                        timeTracking[currentTaskId] = {
+                            total: timeTracking[currentTaskId],
+                            sessionDetails: [{ date: today, seconds: timeTracking[currentTaskId] }]
+                        };
+                    }
+                    
+                    if (!timeTracking[currentTaskId]) {
+                        timeTracking[currentTaskId] = { total: 0, sessionDetails: [] };
+                    }
+                    
+                    timeTracking[currentTaskId].total += elapsedSeconds;
+                    
+                    timeTracking[currentTaskId].sessionDetails.push({
+                        date: today,
+                        seconds: elapsedSeconds
+                    });
+                    
+                    save();
+                }
+            }
+            
+            timerStartTime = null;
+            lastSavedTime = 0;
+            document.getElementById('timer').textContent = '00:00:00';
+            renderTimeList();
+        }
+
+        function addTask() {
+            const input = document.getElementById('newTask');
+            const text = input.value.trim();
+            if (!text) return;
+            tasks.push({ id: Date.now().toString(), text, completed: false });
+            input.value = '';
+            save();
+            render();
+        }
+
+        function showSyncUI() {
+            document.getElementById('syncLoggedOut').style.display = syncCode ? 'none' : 'block';
+            document.getElementById('syncLoggedIn').style.display = syncCode ? 'block' : 'none';
+            document.getElementById('syncCodeDisplay').textContent = syncCode || '';
+            document.getElementById('syncEnter').style.display = 'none';
+            document.getElementById('syncCreate').style.display = 'block';
+            document.getElementById('syncToggle').textContent = 'Уже есть код? Войти';
+        }
+
+        function generateCode() {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let c = '';
+            for (let i = 0; i < 16; i++) c += chars[Math.floor(Math.random() * chars.length)];
+            return c;
+        }
+
+        document.getElementById('addBtn').onclick = addTask;
+        document.getElementById('newTask').onkeydown = e => { if (e.key === 'Enter') addTask(); };
+        document.getElementById('startBtn').onclick = startTimer;
+        document.getElementById('stopBtn').onclick = stopTimer;
+
+        document.getElementById('syncCreateBtn').onclick = async () => {
+            syncCode = generateCode();
+            localStorage.setItem(SYNC_CODE_KEY, syncCode);
+            await pushToCloud({ tasks, timeTracking });
+            showSyncUI();
+            document.getElementById('syncLoggedIn').style.display = 'block';
+            document.getElementById('syncLoggedOut').style.display = 'none';
+            setSyncStatus('Код создан. Сохраните его: ' + syncCode);
+            syncPollInterval = setInterval(pullFromCloud, 4000);
+        };
+
+        document.getElementById('syncToggle').onclick = () => {
+            const enter = document.getElementById('syncEnter');
+            const create = document.getElementById('syncCreate');
+            if (enter.style.display === 'none') {
+                enter.style.display = 'block';
+                create.style.display = 'none';
+                document.getElementById('syncToggle').textContent = 'Создать новый код';
+            } else {
+                enter.style.display = 'none';
+                create.style.display = 'block';
+                document.getElementById('syncToggle').textContent = 'Уже есть код? Войти';
+            }
+        };
+
+        document.getElementById('syncConnect').onclick = async () => {
+            syncCode = document.getElementById('syncCodeInput').value.trim().toLowerCase();
+            if (!syncCode) return;
+            syncCode = syncCode.replace(/[^a-zA-Z0-9_-]/g, '');
+            if (syncCode.length < 8) {
+                setSyncStatus('Код должен быть не менее 8 символов', true);
+                return;
+            }
+            localStorage.setItem(SYNC_CODE_KEY, syncCode);
+            await pullFromCloud();
+            showSyncUI();
+            document.getElementById('syncLoggedIn').style.display = 'block';
+            document.getElementById('syncLoggedOut').style.display = 'none';
+            syncPollInterval = setInterval(pullFromCloud, 4000);
+            render();
+        };
+
+        load();
+        render();
+        showSyncUI();
+
+        document.getElementById('syncDisconnect').onclick = () => {
+            syncCode = null;
+            localStorage.removeItem(SYNC_CODE_KEY);
+            if (syncPollInterval) clearInterval(syncPollInterval);
+            showSyncUI();
+            document.getElementById('syncLoggedIn').style.display = 'none';
+            document.getElementById('syncLoggedOut').style.display = 'block';
+        };
+
+        if (syncCode) {
+            document.getElementById('syncLoggedIn').style.display = 'block';
+            document.getElementById('syncLoggedOut').style.display = 'none';
+            showSyncUI();
+            pullFromCloud().then(() => render());
+            syncPollInterval = setInterval(pullFromCloud, 4000);
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (timerRunning) {
+                stopTimer();
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            if (timerRunning && !timerInterval) {
+                timerInterval = setInterval(updateTimerDisplay, 100);
+            }
+        });
+
+        window.addEventListener('blur', () => {
+            if (timerRunning && timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        });
+    </script>
+</body>
+</html>
