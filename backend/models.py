@@ -13,6 +13,7 @@ class PriorityEnum(str, enum.Enum):
     urgent = "urgent"
     medium = "medium"
     low = "low"
+    overdue = "overdue"  # Deprecated: kept for backward compatibility with existing DB records
     future = "future"
 
 class StatusEnum(str, enum.Enum):
