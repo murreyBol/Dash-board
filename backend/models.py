@@ -13,7 +13,6 @@ class PriorityEnum(str, enum.Enum):
     urgent = "urgent"
     medium = "medium"
     low = "low"
-    overdue = "overdue"
     future = "future"
 
 class StatusEnum(str, enum.Enum):

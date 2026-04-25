@@ -194,5 +194,10 @@ const api = {
         if (endDate) params.append('end_date', endDate);
         if (params.toString()) url += `?${params.toString()}`;
         return this.request(url);
+    },
+
+    // Overdue
+    async getOverdueTasks() {
+        return this.request('/tasks/overdue');
     }
 };

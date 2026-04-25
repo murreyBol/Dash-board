@@ -55,6 +55,10 @@ class Task(TaskBase):
     completed_at: Optional[datetime] = None
     postponed_at: Optional[datetime] = None
     archived_at: Optional[datetime] = None
+
+class OverdueTask(Task):
+    last_activity_at: datetime
+    inactive_days: int
     created_at: datetime
     updated_at: datetime
 

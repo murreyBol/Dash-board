@@ -217,3 +217,53 @@ def get_calendar_sessions(db: Session, start_date: Optional[str] = None, end_dat
         query = query.filter(models.TimeSession.started_at <= end_date)
 
     return query.all()
+
+def get_task_last_activity(db: Session, task_id: str) -> Optional[datetime]:
+    """Calculate the most recent activity timestamp for a task."""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        return None
+
+    timestamps = [task.created_at, task.updated_at]
+
+    # Check latest comment
+    latest_comment = db.query(models.Comment).filter(
+        models.Comment.task_id == task_id
+    ).order_by(models.Comment.created_at.desc()).first()
+    if latest_comment:
+        timestamps.append(latest_comment.created_at)
+        if latest_comment.updated_at:
+            timestamps.append(latest_comment.updated_at)
+
+    # Check latest time session
+    latest_session = db.query(models.TimeSession).filter(
+        models.TimeSession.task_id == task_id
+    ).order_by(models.TimeSession.started_at.desc()).first()
+    if latest_session:
+        timestamps.append(latest_session.started_at)
+        if latest_session.ended_at:
+            timestamps.append(latest_session.ended_at)
+
+    # Return the most recent timestamp
+    return max(ts for ts in timestamps if ts is not None)
+
+def get_overdue_tasks(db: Session, days_threshold: int = 7):
+    """Get tasks with no activity for the specified number of days."""
+    all_tasks = db.query(models.Task).filter(
+        models.Task.status != models.StatusEnum.archived
+    ).all()
+
+    overdue_tasks = []
+    now = datetime.utcnow()
+
+    for task in all_tasks:
+        last_activity = get_task_last_activity(db, task.id)
+        if last_activity:
+            days_inactive = (now - last_activity).days
+            if days_inactive >= days_threshold:
+                # Add computed fields to task object
+                task.last_activity_at = last_activity
+                task.inactive_days = days_inactive
+                overdue_tasks.append(task)
+
+    return overdue_tasks

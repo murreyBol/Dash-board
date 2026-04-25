@@ -232,6 +232,13 @@ async def get_archived_tasks(
 ):
     return crud.get_archived_tasks(db)
 
+@app.get("/tasks/overdue", response_model=List[schemas.OverdueTask])
+async def get_overdue_tasks(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    return crud.get_overdue_tasks(db)
+
 # Timer endpoints
 @app.post("/tasks/{task_id}/start-timer", response_model=schemas.TimeSession)
 async def start_timer(

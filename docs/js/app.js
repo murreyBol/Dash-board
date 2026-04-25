@@ -149,9 +149,7 @@ const app = {
     // Overdue Modal
     async showOverdue() {
         try {
-            const overdueTasks = kanban.tasks.filter(task =>
-                task.priority === 'overdue' && task.status !== 'archived'
-            );
+            const overdueTasks = await api.getOverdueTasks();
             this.renderOverdue(overdueTasks);
             document.getElementById('overdueModal').style.display = 'block';
         } catch (error) {
@@ -174,11 +172,15 @@ const app = {
 
         container.innerHTML = tasks.map(task => {
             const assignee = task.assigned_to ? 'Назначена' : 'Не назначена';
+            const lastActivity = new Date(task.last_activity_at).toLocaleDateString('ru-RU');
+            const inactiveDays = task.inactive_days;
             return `
                 <div class="archive-item">
                     <h3>${this.escapeHtml(task.title)}</h3>
                     <p>${this.escapeHtml(task.description || 'Нет описания')}</p>
                     <p style="margin-top: 8px;"><strong>Статус:</strong> ${assignee}</p>
+                    <p style="margin-top: 4px;"><strong>Последняя активность:</strong> ${lastActivity}</p>
+                    <p style="margin-top: 4px; color: #e74c3c;"><strong>Неактивна:</strong> ${inactiveDays} дней</p>
                 </div>
             `;
         }).join('');
