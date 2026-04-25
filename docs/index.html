@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Planner Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/kanban.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen">
+        <div class="login-container">
+            <h1>Task Planner</h1>
+            <div id="loginForm">
+                <h2>Вход</h2>
+                <input type="text" id="loginUsername" placeholder="Имя пользователя" />
+                <input type="password" id="loginPassword" placeholder="Пароль" />
+                <button onclick="app.login()">Войти</button>
+                <p>Нет аккаунта? <a href="#" onclick="app.showRegister()">Зарегистрироваться</a></p>
+            </div>
+            <div id="registerForm" style="display: none;">
+                <h2>Регистрация</h2>
+                <input type="text" id="registerUsername" placeholder="Имя пользователя" />
+                <input type="email" id="registerEmail" placeholder="Email" />
+                <input type="password" id="registerPassword" placeholder="Пароль" />
+                <button onclick="app.register()">Зарегистрироваться</button>
+                <p>Уже есть аккаунт? <a href="#" onclick="app.showLogin()">Войти</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboardScreen" class="screen" style="display: none;">
+        <header>
+            <h1>Task Planner Dashboard</h1>
+            <div class="header-actions">
+                <span id="currentUser"></span>
+                <button onclick="app.showSettings()">⚙️ Настройки</button>
+                <button onclick="app.showCalendar()">📅 Календарь</button>
+                <button onclick="app.showArchive()">📦 Архив</button>
+                <button onclick="app.logout()">Выход</button>
+            </div>
+        </header>
+
+        <div class="dashboard-content">
+            <button class="add-task-btn" onclick="app.showCreateTaskModal()">+ Создать задачу</button>
+
+            <div class="kanban-board">
+                <div class="kanban-column" data-priority="urgent">
+                    <div class="column-header urgent">
+                        <h3>🔥 Срочная</h3>
+                        <span class="task-count">0</span>
+                    </div>
+                    <div class="column-content" id="urgent-tasks"></div>
+                </div>
+
+                <div class="kanban-column" data-priority="medium">
+                    <div class="column-header medium">
+                        <h3>⚡ Средняя срочность</h3>
+                        <span class="task-count">0</span>
+                    </div>
+                    <div class="column-content" id="medium-tasks"></div>
+                </div>
+
+                <div class="kanban-column" data-priority="low">
+                    <div class="column-header low">
+                        <h3>📌 Малая срочность</h3>
+                        <span class="task-count">0</span>
+                    </div>
+                    <div class="column-content" id="low-tasks"></div>
+                </div>
+
+                <div class="kanban-column" data-priority="future">
+                    <div class="column-header future">
+                        <h3>🔮 В будущем</h3>
+                        <span class="task-count">0</span>
+                    </div>
+                    <div class="column-content" id="future-tasks"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Task Modal -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="app.closeTaskModal()">&times;</span>
+            <h2 id="taskModalTitle">Создать задачу</h2>
+            <input type="text" id="taskTitle" placeholder="Название задачи" />
+            <textarea id="taskDescription" placeholder="Описание задачи"></textarea>
+            <select id="taskPriority">
+                <option value="urgent">Срочная</option>
+                <option value="medium">Средняя срочность</option>
+                <option value="low">Малая срочность</option>
+                <option value="future">В будущем</option>
+            </select>
+            <button onclick="app.saveTask()">Сохранить</button>
+        </div>
+    </div>
+
+    <!-- Comments Modal -->
+    <div id="commentsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="app.closeCommentsModal()">&times;</span>
+            <h2>Комментарии</h2>
+            <div id="commentsList"></div>
+            <div class="comment-input">
+                <textarea id="newComment" placeholder="Добавить комментарий..."></textarea>
+                <button onclick="app.addComment()">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Postpone Modal -->
+    <div id="postponeModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="app.closePostponeModal()">&times;</span>
+            <h2>Отложить задачу</h2>
+            <textarea id="postponeReason" placeholder="Причина отложения..."></textarea>
+            <button onclick="app.postponeTask()">Отложить</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="app.closeSettingsModal()">&times;</span>
+            <h2>Настройки</h2>
+            <label>
+                <input type="checkbox" id="autoStartTimer" />
+                Автоматически запускать таймер при назначении задачи
+            </label>
+            <button onclick="app.saveSettings()">Сохранить</button>
+        </div>
+    </div>
+
+    <!-- Calendar Modal -->
+    <div id="calendarModal" class="modal">
+        <div class="modal-content large">
+            <span class="close" onclick="app.closeCalendarModal()">&times;</span>
+            <h2>Календарь активности</h2>
+            <div class="calendar-header">
+                <button onclick="calendar.prevMonth()">◀</button>
+                <span id="calendarTitle"></span>
+                <button onclick="calendar.nextMonth()">▶</button>
+            </div>
+            <div id="calendarGrid"></div>
+            <div id="calendarDetails"></div>
+        </div>
+    </div>
+
+    <!-- Archive Modal -->
+    <div id="archiveModal" class="modal">
+        <div class="modal-content large">
+            <span class="close" onclick="app.closeArchiveModal()">&times;</span>
+            <h2>Архив задач</h2>
+            <div id="archiveList"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/timer.js"></script>
+    <script src="js/comments.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/kanban.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
