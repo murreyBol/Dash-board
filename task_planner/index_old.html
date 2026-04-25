@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Планировщик задач</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 24px;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        h1 { font-size: 1.5rem; margin: 0 0 20px 0; }
+        .app-layout {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+        }
+        .left-panel {
+            width: 420px;
+            min-width: 340px;
+        }
+        .calendar-window {
+            flex: 1;
+            min-width: 320px;
+            background: #16213e;
+            border-radius: 14px;
+            padding: 18px;
+            border: 1px solid #274069;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+            position: sticky;
+            top: 18px;
+        }
+        section {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        section h2 { font-size: 1rem; margin: 0 0 12px 0; color: #0d7377; }
+        .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #fff;
+            font-size: 14px;
+        }
+        input[type="text"]:focus { outline: none; border-color: #0d7377; }
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #0d7377;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #0a5c5f; }
+        button.secondary { background: #555; }
+        button.secondary:hover { background: #666; }
+        button.danger { background: #a23; }
+        button.danger:hover { background: #b34; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        select {
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #fff;
+            border: 1px solid #333;
+            font-size: 14px;
+            min-width: 220px;
+        }
+        .timer-display { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #333;
+        }
+        .task-item:last-child { border-bottom: none; }
+        .task-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #0d7377;
+        }
+        .task-item .text {
+            flex: 1;
+            font-size: 15px;
+        }
+        .task-item .text.done {
+            text-decoration: line-through;
+            color: #888;
+        }
+        .time-list { color: #aaa; font-size: 14px; }
+        .time-list div { padding: 4px 0; }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .calendar-title {
+            color: #0d7377;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .day-name {
+            text-align: center;
+            font-size: 12px;
+            color: #8ca3c9;
+        }
+        .calendar-day {
+            border: 1px solid #2f4f7a;
+            border-radius: 8px;
+            min-height: 52px;
+            background: #0f3460;
+            color: #fff;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+        .calendar-day.empty {
+            cursor: default;
+            opacity: 0.35;
+            background: #102946;
+        }
+        .calendar-day.active {
+            border-color: #0d7377;
+            box-shadow: 0 0 0 1px #0d7377 inset;
+        }
+        .calendar-day .num { font-size: 13px; }
+        .calendar-day .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0d7377;
+        }
+        .day-stats {
+            background: #102946;
+            border-radius: 10px;
+            padding: 12px;
+            min-height: 180px;
+        }
+        .day-stats h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #a5bddf;
+        }
+        .session-item {
+            border-bottom: 1px solid #2f4f7a;
+            padding: 8px 0;
+            font-size: 13px;
+            color: #d6def0;
+        }
+        .session-item:last-child { border-bottom: none; }
+        @media (max-width: 980px) {
+            .app-layout { flex-direction: column; }
+            .left-panel, .calendar-window { width: 100%; min-width: 0; }
+            .calendar-window { position: static; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Планировщик задач</h1>
+
+    <div class="app-layout">
+        <div class="left-panel">
+            <section>
+                <h2>Таймер</h2>
+                <div class="row">
+                    <select id="taskSelect">
+                        <option value="">Выберите задачу</option>
+                    </select>
+                    <span class="timer-display" id="timer">00:00:00</span>
+                    <button id="startBtn">Старт</button>
+                    <button id="stopBtn" disabled>Стоп</button>
+                </div>
+            </section>
+
+            <section>
+                <h2>Мои задачи</h2>
+                <div class="row">
+                    <input type="text" id="newTask" placeholder="Новая задача..." maxlength="200">
+                    <button id="addBtn">+ Добавить</button>
+                </div>
+                <div id="taskList"></div>
+            </section>
+
+            <section>
+                <h2>Время по задачам</h2>
+                <div class="time-list" id="timeList">Пока нет данных о времени</div>
+            </section>
+        </div>
+
+        <div class="calendar-window">
+            <div class="calendar-header">
+                <button id="prevMonth" class="secondary">◀</button>
+                <div class="calendar-title" id="calendarTitle">Календарь</div>
+                <button id="nextMonth" class="secondary">▶</button>
+            </div>
+            <div class="calendar-grid" id="calendarDaysHeader"></div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <div class="day-stats">
+                <h3 id="selectedDateLabel">Выберите день</h3>
+                <div id="selectedDateSessions">Нет записей за выбранную дату</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'taskPlannerData';
+        let tasks = [];
+        let timeTracking = {};
+        let timerRunning = false;
+        let currentTaskId = null;
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let timerStartMs = 0;
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let selectedDate = null;
+
+        function load() {
+            try {
+                const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+                tasks = data.tasks || [];
+                timeTracking = data.timeTracking || {};
+            } catch (e) {
+                tasks = [];
+                timeTracking = {};
+            }
+        }
+
+        function save() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, timeTracking }));
+        }
+
+        function ensureTaskTrackShape(taskId) {
+            const current = timeTracking[taskId];
+            if (!current) {
+                timeTracking[taskId] = { total: 0, sessions: [] };
+                return;
+            }
+            if (typeof current === 'number') {
+                timeTracking[taskId] = { total: current, sessions: [] };
+                return;
+            }
+            if (!Array.isArray(current.sessions)) current.sessions = [];
+            if (typeof current.total !== 'number') current.total = 0;
+        }
+
+        function formatTime(sec) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        function formatDuration(sec) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            if (h > 0) return `${h} ч ${m} мин`;
+            if (m > 0) return `${m} мин ${s} сек`;
+            return `${s} сек`;
+        }
+
+        function renderTasks() {
+            const list = document.getElementById('taskList');
+            const select = document.getElementById('taskSelect');
+            list.innerHTML = '';
+            select.innerHTML = '<option value="">Выберите задачу</option>';
+
+            tasks.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'task-item';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = t.completed;
+                cb.onchange = () => { t.completed = !t.completed; save(); render(); };
+                const span = document.createElement('span');
+                span.className = 'text' + (t.completed ? ' done' : '');
+                span.textContent = t.text;
+                const del = document.createElement('button');
+                del.className = 'danger';
+                del.textContent = '✕';
+                del.onclick = () => {
+                    tasks = tasks.filter(x => x.id !== t.id);
+                    if (currentTaskId === t.id) stopTimer();
+                    save();
+                    render();
+                };
+                div.append(cb, span, del);
+                list.appendChild(div);
+                select.appendChild(new Option(t.text, t.id));
+            });
+        }
+
+        function renderTimeList() {
+            const el = document.getElementById('timeList');
+            const entries = Object.entries(timeTracking)
+                .map(([id, data]) => ({
+                    id,
+                    total: typeof data === 'number' ? data : (data.total || 0)
+                }))
+                .sort((a, b) => b.total - a.total);
+            if (entries.length === 0) {
+                el.textContent = 'Пока нет данных о времени';
+                return;
+            }
+            const names = Object.fromEntries(tasks.map(t => [t.id, t.text]));
+            el.innerHTML = entries.map(({ id, total }) =>
+                `<div>• ${names[id] || '(удалённая)'}: ${formatDuration(total)}</div>`
+            ).join('');
+        }
+
+        function render() {
+            renderTasks();
+            renderTimeList();
+            renderCalendar();
+            renderSelectedDateDetails();
+        }
+
+        function updateTimerDisplay() {
+            if (!timerRunning) {
+                document.getElementById('timer').textContent = formatTime(0);
+                return;
+            }
+            const elapsed = Math.floor((Date.now() - timerStartMs) / 1000);
+            timerSeconds = elapsed;
+            document.getElementById('timer').textContent = formatTime(elapsed);
+        }
+
+        function startTimer() {
+            const sel = document.getElementById('taskSelect');
+            currentTaskId = sel.value;
+            if (!currentTaskId || timerRunning) return;
+            timerRunning = true;
+            timerStartMs = Date.now();
+            timerSeconds = 0;
+            document.getElementById('timer').textContent = formatTime(0);
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            timerInterval = setInterval(updateTimerDisplay, 250);
+        }
+
+        function stopTimer() {
+            if (!timerRunning) return;
+            timerRunning = false;
+            clearInterval(timerInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            if (currentTaskId && timerSeconds > 0) {
+                ensureTaskTrackShape(currentTaskId);
+                const date = new Date();
+                const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+                timeTracking[currentTaskId].total += timerSeconds;
+                timeTracking[currentTaskId].sessions.push({
+                    date: dateKey,
+                    seconds: timerSeconds
+                });
+                save();
+            }
+            timerSeconds = 0;
+            timerStartMs = 0;
+            updateTimerDisplay();
+            render();
+        }
+
+        function getSessionsByDate(dateKey) {
+            const names = Object.fromEntries(tasks.map(t => [t.id, t.text]));
+            const result = [];
+            Object.entries(timeTracking).forEach(([taskId, data]) => {
+                const sessions = typeof data === 'object' && Array.isArray(data.sessions) ? data.sessions : [];
+                sessions.forEach(session => {
+                    if (session.date === dateKey) {
+                        result.push({
+                            taskName: names[taskId] || '(удалённая)',
+                            seconds: session.seconds || 0
+                        });
+                    }
+                });
+            });
+            return result;
+        }
+
+        function getDayTotalSeconds(dateKey) {
+            return getSessionsByDate(dateKey).reduce((sum, item) => sum + item.seconds, 0);
+        }
+
+        function renderCalendar() {
+            const title = document.getElementById('calendarTitle');
+            const grid = document.getElementById('calendarGrid');
+            const daysHeader = document.getElementById('calendarDaysHeader');
+            const monthName = new Date(currentYear, currentMonth, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+            title.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+            daysHeader.innerHTML = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']
+                .map(day => `<div class="day-name">${day}</div>`)
+                .join('');
+
+            const first = new Date(currentYear, currentMonth, 1);
+            const startOffset = (first.getDay() + 6) % 7;
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const cells = [];
+
+            for (let i = 0; i < startOffset; i++) {
+                cells.push('<div class="calendar-day empty"></div>');
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                const total = getDayTotalSeconds(dateKey);
+                const hasData = total > 0;
+                const isActive = selectedDate === dateKey ? ' active' : '';
+                cells.push(
+                    `<button class="calendar-day${isActive}" data-date="${dateKey}">
+                        <span class="num">${day}</span>
+                        ${hasData ? '<span class="dot"></span>' : '<span></span>'}
+                    </button>`
+                );
+            }
+            grid.innerHTML = cells.join('');
+
+            Array.from(grid.querySelectorAll('[data-date]')).forEach(btn => {
+                btn.onclick = () => {
+                    selectedDate = btn.dataset.date;
+                    renderCalendar();
+                    renderSelectedDateDetails();
+                };
+            });
+        }
+
+        function renderSelectedDateDetails() {
+            const label = document.getElementById('selectedDateLabel');
+            const list = document.getElementById('selectedDateSessions');
+            if (!selectedDate) {
+                label.textContent = 'Выберите день';
+                list.textContent = 'Нет записей за выбранную дату';
+                return;
+            }
+            const sessions = getSessionsByDate(selectedDate);
+            const formatted = new Date(selectedDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+            label.textContent = `Статистика за ${formatted}`;
+            if (sessions.length === 0) {
+                list.textContent = 'Нет записей за выбранную дату';
+                return;
+            }
+            const total = sessions.reduce((sum, item) => sum + item.seconds, 0);
+            list.innerHTML = `<div class="session-item"><strong>Всего за день:</strong> ${formatDuration(total)}</div>` +
+                sessions.map(s => `<div class="session-item">${s.taskName}: ${formatDuration(s.seconds)}</div>`).join('');
+        }
+
+        function addTask() {
+            const input = document.getElementById('newTask');
+            const text = input.value.trim();
+            if (!text) return;
+            tasks.push({ id: Date.now().toString(), text, completed: false });
+            input.value = '';
+            save();
+            render();
+        }
+
+        document.getElementById('addBtn').onclick = addTask;
+        document.getElementById('newTask').onkeydown = e => { if (e.key === 'Enter') addTask(); };
+        document.getElementById('startBtn').onclick = startTimer;
+        document.getElementById('stopBtn').onclick = stopTimer;
+        document.getElementById('prevMonth').onclick = () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        };
+        document.getElementById('nextMonth').onclick = () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar();
+        };
+
+        load();
+        render();
+    </script>
+</body>
+</html>
