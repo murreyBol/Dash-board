@@ -123,7 +123,10 @@ const kanban = {
                         ${isTimerRunning ? '⏸ Стоп' : '▶ Старт'}
                     </button>
                 ` : ''}
-                <button class="btn-archive" onclick="kanban.archiveTask('${task.id}')">📦 Архив</button>
+                ${task.status !== 'completed' ?
+                    `<button class="btn-complete" onclick="kanban.completeTask('${task.id}')">✓ Выполнено</button>` : ''}
+                ${task.status === 'completed' ?
+                    `<button class="btn-archive" onclick="kanban.archiveTask('${task.id}')">📦 Архив</button>` : ''}
                 <button class="btn-delete" onclick="kanban.deleteTask('${task.id}')">✕</button>
             </div>
         `;

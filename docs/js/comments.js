@@ -16,7 +16,7 @@ const comments = {
         // Change modal title
         const modalTitle = document.querySelector('#commentsModal h2');
         if (modalTitle) {
-            modalTitle.textContent = 'Какая работа проделана?';
+            modalTitle.textContent = 'Добавить комментарий';
         }
 
         // Hide comments list, show only input
@@ -90,16 +90,16 @@ const comments = {
         if (!text) return;
 
         try {
+            // Always add regular comment (no auto-completion)
+            await api.createComment(this.currentTaskId, text);
+            document.getElementById('newComment').value = '';
+
             if (this.isCompletionMode) {
-                // Complete task with comment and archive
-                await api.completeTaskWithComment(this.currentTaskId, text);
+                // Close modal and reload tasks to show new comment
                 this.close();
                 await kanban.loadTasks();
-                alert('Задача выполнена и перемещена в архив');
             } else {
-                // Regular comment
-                await api.createComment(this.currentTaskId, text);
-                document.getElementById('newComment').value = '';
+                // Reload comments in modal
                 await this.loadComments(this.currentTaskId);
             }
         } catch (error) {

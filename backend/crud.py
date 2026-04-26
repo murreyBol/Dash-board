@@ -123,8 +123,16 @@ def assign_task(db: Session, task_id: str, user_id: str):
 def complete_task(db: Session, task_id: str):
     db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if db_task:
+        # Calculate total time from all sessions
+        all_sessions = db.query(models.TimeSession).filter(
+            models.TimeSession.task_id == task_id
+        ).all()
+        total_seconds = sum(session.duration_seconds for session in all_sessions if session.duration_seconds)
+
+        # Mark task as completed (not archived yet)
         db_task.status = models.StatusEnum.completed
         db_task.completed_at = datetime.utcnow()
+        db_task.total_time_seconds = total_seconds
         db_task.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(db_task)
@@ -144,6 +152,10 @@ def postpone_task(db: Session, task_id: str, reason: str):
 def archive_task(db: Session, task_id: str):
     db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if db_task:
+        # Check: can only archive completed or postponed tasks
+        if db_task.status not in [models.StatusEnum.completed, models.StatusEnum.postponed]:
+            raise ValueError(f"Cannot archive task with status '{db_task.status}'. Complete or postpone it first.")
+        
         db_task.status = models.StatusEnum.archived
         db_task.archived_at = datetime.utcnow()
         db_task.updated_at = datetime.utcnow()
@@ -234,40 +246,6 @@ def stop_timer(db: Session, task_id: str, user_id: str):
         db.refresh(active_session)
 
     return active_session
-
-def complete_task_with_comment(db: Session, task_id: str, user_id: str, comment_text: str):
-    """Complete task with comment and archive it automatically."""
-    # Get the task
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if not db_task:
-        return None
-
-    # Calculate total time from all sessions
-    all_sessions = db.query(models.TimeSession).filter(
-        models.TimeSession.task_id == task_id
-    ).all()
-    total_seconds = sum(session.duration_seconds for session in all_sessions if session.duration_seconds)
-
-    # Add comment
-    db_comment = models.Comment(
-        task_id=task_id,
-        user_id=user_id,
-        text=comment_text
-    )
-    db.add(db_comment)
-
-    # Complete and archive task
-    db_task.status = models.StatusEnum.archived
-    db_task.completed_at = datetime.utcnow()
-    db_task.archived_at = datetime.utcnow()
-    db_task.total_time_seconds = total_seconds
-    db_task.updated_at = datetime.utcnow()
-
-    db.commit()
-    db.refresh(db_task)
-    db.refresh(db_comment)
-
-    return db_task
 
 def get_calendar_sessions(db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None):
     query = db.query(models.TimeSession).filter(models.TimeSession.ended_at != None)

@@ -93,6 +93,10 @@ const websocket = {
                 kanban.updateTask(data.task);
                 break;
 
+            case 'task_archived':
+                kanban.removeTask(data.task.id);
+                break;
+
             case 'timer_started':
                 kanban.updateTask(data.task);
                 break;

@@ -309,16 +309,26 @@ async def complete_task(
     db_task = crud.complete_task(db, task_id)
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Validate separately from broadcast
+    try:
+        task_data = schemas.Task.model_validate(db_task).model_dump()
+    except Exception as validation_error:
+        print(f"Task validation error: {validation_error}")
+        raise HTTPException(status_code=500, detail="Task validation failed")
+    
+    # Broadcast separately
     try:
         await manager.broadcast({
             "type": "task_completed",
             "data": {
-                "task": schemas.Task.model_validate(db_task).model_dump(),
+                "task": task_data,
                 "user": {"id": current_user.id, "username": current_user.username}
             }
         })
     except Exception as broadcast_error:
         print(f"WebSocket broadcast failed: {broadcast_error}")
+    
     return db_task
 
 @app.post("/tasks/{task_id}/postpone", response_model=schemas.Task)
@@ -350,9 +360,33 @@ async def archive_task(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_task = crud.archive_task(db, task_id)
+    try:
+        db_task = crud.archive_task(db, task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Validate separately from broadcast
+    try:
+        task_data = schemas.Task.model_validate(db_task).model_dump()
+    except Exception as validation_error:
+        print(f"Task validation error: {validation_error}")
+        raise HTTPException(status_code=500, detail="Task validation failed")
+    
+    # Broadcast separately
+    try:
+        await manager.broadcast({
+            "type": "task_archived",
+            "data": {
+                "task": task_data,
+                "user": {"id": current_user.id, "username": current_user.username}
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
+    
     return db_task
 
 @app.get("/tasks/archived/list", response_model=List[schemas.Task])
@@ -406,35 +440,12 @@ async def stop_timer(
             "data": {
                 "task": schemas.Task.model_validate(task).model_dump(),
                 "user": {"id": current_user.id, "username": current_user.username},
-                "duration": session.duration_seconds,
-                "show_comment_modal": True
+                "duration": session.duration_seconds
             }
         })
     except Exception as broadcast_error:
         print(f"WebSocket broadcast failed: {broadcast_error}")
     return session
-
-@app.post("/tasks/{task_id}/complete-with-comment", response_model=schemas.Task)
-async def complete_task_with_comment(
-    task_id: str,
-    comment_data: schemas.CompleteTaskWithComment,
-    current_user: models.User = Depends(auth.get_current_user),
-    db: Session = Depends(get_db)
-):
-    db_task = crud.complete_task_with_comment(db, task_id, current_user.id, comment_data.comment_text)
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    try:
-        await manager.broadcast({
-            "type": "task_completed_archived",
-            "data": {
-                "task": schemas.Task.model_validate(db_task).model_dump(),
-                "user": {"id": current_user.id, "username": current_user.username}
-            }
-        })
-    except Exception as broadcast_error:
-        print(f"WebSocket broadcast failed: {broadcast_error}")
-    return db_task
 
 # Comment endpoints
 @app.get("/tasks/{task_id}/comments", response_model=List[schemas.Comment])
