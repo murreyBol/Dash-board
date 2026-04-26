@@ -1,17 +1,48 @@
 const comments = {
     currentTaskId: null,
+    isCompletionMode: false,
 
     async show(taskId) {
         this.currentTaskId = taskId;
+        this.isCompletionMode = false;
         await this.loadComments(taskId);
         document.getElementById('commentsModal').style.display = 'block';
     },
 
+    showForCompletion(taskId) {
+        this.currentTaskId = taskId;
+        this.isCompletionMode = true;
+
+        // Change modal title
+        const modalTitle = document.querySelector('#commentsModal h2');
+        if (modalTitle) {
+            modalTitle.textContent = 'Какая работа проделана?';
+        }
+
+        // Hide comments list, show only input
+        document.getElementById('commentsList').style.display = 'none';
+        document.getElementById('commentsModal').style.display = 'block';
+
+        // Focus on textarea
+        const textarea = document.getElementById('newComment');
+        if (textarea) {
+            textarea.focus();
+        }
+    },
+
     close() {
         this.currentTaskId = null;
+        this.isCompletionMode = false;
         document.getElementById('commentsModal').style.display = 'none';
         document.getElementById('commentsList').innerHTML = '';
+        document.getElementById('commentsList').style.display = 'block';
         document.getElementById('newComment').value = '';
+
+        // Reset modal title
+        const modalTitle = document.querySelector('#commentsModal h2');
+        if (modalTitle) {
+            modalTitle.textContent = 'Комментарии';
+        }
     },
 
     async loadComments(taskId) {
@@ -59,9 +90,18 @@ const comments = {
         if (!text) return;
 
         try {
-            await api.createComment(this.currentTaskId, text);
-            document.getElementById('newComment').value = '';
-            await this.loadComments(this.currentTaskId);
+            if (this.isCompletionMode) {
+                // Complete task with comment and archive
+                await api.completeTaskWithComment(this.currentTaskId, text);
+                this.close();
+                await kanban.loadTasks();
+                alert('Задача выполнена и перемещена в архив');
+            } else {
+                // Regular comment
+                await api.createComment(this.currentTaskId, text);
+                document.getElementById('newComment').value = '';
+                await this.loadComments(this.currentTaskId);
+            }
         } catch (error) {
             console.error('Failed to add comment:', error);
             alert('Ошибка добавления комментария');

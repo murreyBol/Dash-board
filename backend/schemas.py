@@ -55,6 +55,7 @@ class Task(TaskBase):
     completed_at: Optional[datetime] = None
     postponed_at: Optional[datetime] = None
     archived_at: Optional[datetime] = None
+    total_time_seconds: int = 0
 
 class OverdueTask(Task):
     last_activity_at: datetime
@@ -63,6 +64,10 @@ class OverdueTask(Task):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+# Complete task with comment schema
+class CompleteTaskWithComment(BaseModel):
+    comment_text: str
 
 # Comment schemas
 class CommentBase(BaseModel):

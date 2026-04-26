@@ -15,12 +15,12 @@ from database import engine, get_db
 # Create tables
 models.Base.metadata.create_all(bind=engine)
 
-# Run migration to add is_admin field
+# Run migration to add is_admin field and total_time_seconds
 def run_migration():
     from sqlalchemy import text
     with engine.connect() as conn:
         try:
-            # Check if column exists (PostgreSQL syntax)
+            # Check if is_admin column exists (PostgreSQL syntax)
             result = conn.execute(text("""
                 SELECT COUNT(*)
                 FROM information_schema.columns
@@ -30,6 +30,19 @@ def run_migration():
             if result.scalar() == 0:
                 print("Adding is_admin column to users table...")
                 conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+                print("✓ Column added successfully")
+
+            # Check if total_time_seconds column exists
+            result = conn.execute(text("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_name='tasks' AND column_name='total_time_seconds'
+            """))
+
+            if result.scalar() == 0:
+                print("Adding total_time_seconds column to tasks table...")
+                conn.execute(text("ALTER TABLE tasks ADD COLUMN total_time_seconds INTEGER DEFAULT 0"))
                 conn.commit()
                 print("✓ Column added successfully")
 
@@ -393,12 +406,35 @@ async def stop_timer(
             "data": {
                 "task": schemas.Task.model_validate(task).model_dump(),
                 "user": {"id": current_user.id, "username": current_user.username},
-                "duration": session.duration_seconds
+                "duration": session.duration_seconds,
+                "show_comment_modal": True
             }
         })
     except Exception as broadcast_error:
         print(f"WebSocket broadcast failed: {broadcast_error}")
     return session
+
+@app.post("/tasks/{task_id}/complete-with-comment", response_model=schemas.Task)
+async def complete_task_with_comment(
+    task_id: str,
+    comment_data: schemas.CompleteTaskWithComment,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_task = crud.complete_task_with_comment(db, task_id, current_user.id, comment_data.comment_text)
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        await manager.broadcast({
+            "type": "task_completed_archived",
+            "data": {
+                "task": schemas.Task.model_validate(db_task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username}
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
+    return db_task
 
 # Comment endpoints
 @app.get("/tasks/{task_id}/comments", response_model=List[schemas.Comment])

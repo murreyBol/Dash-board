@@ -52,8 +52,11 @@ const timer = {
         this.activeSessions.delete(taskId);
 
         try {
-            await api.stopTimer(taskId);
+            const result = await api.stopTimer(taskId);
             this.updateDisplay(taskId, 0);
+
+            // Show comment modal after stopping timer
+            comments.showForCompletion(taskId);
         } catch (error) {
             console.error('Failed to stop timer:', error);
             alert('Ошибка остановки таймера');

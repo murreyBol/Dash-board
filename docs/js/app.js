@@ -270,20 +270,77 @@ const app = {
         }
 
         container.innerHTML = tasks.map(task => {
-            const date = new Date(task.archived_at).toLocaleDateString('ru-RU');
+            const date = new Date(task.completed_at || task.archived_at).toLocaleDateString('ru-RU');
+            const timeSpent = this.formatTimeSpent(task.total_time_seconds || 0);
+
+            // Get assignee username
+            const assignee = app.users.find(u => u.id === task.assigned_to);
+            const assigneeName = assignee ? assignee.username : 'Не назначена';
+
             return `
                 <div class="archive-item">
                     <h3>${this.escapeHtml(task.title)}</h3>
                     <p>${this.escapeHtml(task.description || 'Нет описания')}</p>
-                    <p style="margin-top: 8px;"><strong>Архивирована:</strong> ${date}</p>
+                    <p style="margin-top: 8px;"><strong>Дата выполнения:</strong> ${date}</p>
+                    <p style="margin-top: 4px;"><strong>Затраченное время:</strong> ${timeSpent}</p>
+                    <p style="margin-top: 4px;"><strong>Исполнитель:</strong> ${this.escapeHtml(assigneeName)}</p>
+                    <div style="margin-top: 12px;">
+                        <strong>Комментарии:</strong>
+                        <div id="archive-comments-${task.id}" style="margin-top: 8px;">
+                            <button onclick="app.loadArchiveComments('${task.id}')" style="padding: 6px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">Показать комментарии</button>
+                        </div>
+                    </div>
                 </div>
             `;
         }).join('');
     },
 
+    formatTimeSpent(seconds) {
+        if (seconds === 0) return 'Нет данных';
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) return `${hours}ч ${minutes}мин`;
+        if (minutes > 0) return `${minutes}мин`;
+        return `${seconds}сек`;
+    },
+
+    async loadArchiveComments(taskId) {
+        try {
+            const comments = await api.getComments(taskId);
+            const container = document.getElementById(`archive-comments-${taskId}`);
+
+            if (comments.length === 0) {
+                container.innerHTML = '<p style="color: #888; font-size: 14px;">Нет комментариев</p>';
+                return;
+            }
+
+            container.innerHTML = comments.map(comment => {
+                const date = new Date(comment.created_at).toLocaleString('ru-RU');
+                const username = comment.username || 'Пользователь';
+                return `
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 6px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <strong style="color: #3498db;">${this.escapeHtml(username)}</strong>
+                            <span style="color: #95a5a6; font-size: 12px;">${date}</span>
+                        </div>
+                        <div style="color: #ecf0f1; font-size: 14px;">${this.escapeHtml(comment.text)}</div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Failed to load archive comments:', error);
+            const container = document.getElementById(`archive-comments-${taskId}`);
+            container.innerHTML = '<p style="color: #e74c3c;">Ошибка загрузки комментариев</p>';
+        }
+    },
+
     // Comments Modal
     closeCommentsModal() {
         comments.close();
+    },
+
+    addComment() {
+        comments.addComment();
     },
 
     // Admin Panel

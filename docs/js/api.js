@@ -184,6 +184,13 @@ const api = {
         });
     },
 
+    async completeTaskWithComment(taskId, commentText) {
+        return this.request(`/tasks/${taskId}/complete-with-comment`, {
+            method: 'POST',
+            body: JSON.stringify({ comment_text: commentText })
+        });
+    },
+
     // Comments
     async getComments(taskId) {
         return this.request(`/tasks/${taskId}/comments`);
