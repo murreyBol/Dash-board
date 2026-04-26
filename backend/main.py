@@ -33,19 +33,22 @@ def run_migration():
                 conn.commit()
                 print("✓ Column added successfully")
 
-                # Make first user admin
-                print("Setting first user as admin...")
-                conn.execute(text("""
-                    UPDATE users
-                    SET is_admin = 1
-                    WHERE id = (SELECT id FROM users ORDER BY created_at LIMIT 1)
-                """))
-                conn.commit()
-                print("✓ First user is now admin")
+            # Make Viktor admin
+            print("Setting Viktor as admin...")
+            result = conn.execute(text("""
+                UPDATE users
+                SET is_admin = 1
+                WHERE username = 'Viktor'
+            """))
+            conn.commit()
+
+            if result.rowcount > 0:
+                print("✓ Viktor is now admin")
             else:
-                print("✓ Column is_admin already exists")
+                print("⚠ User Viktor not found")
+
         except Exception as e:
-            print(f"Migration error (may be safe to ignore): {e}")
+            print(f"Migration error: {e}")
 
 run_migration()
 
