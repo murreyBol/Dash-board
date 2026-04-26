@@ -42,10 +42,20 @@ const kanban = {
             }
         });
 
-        // Update counts
+        // Update counts with limit indicator
         Object.keys(counts).forEach(priority => {
             const countEl = document.querySelector(`[data-priority="${priority}"] .task-count`);
-            if (countEl) countEl.textContent = counts[priority];
+            if (countEl) {
+                const count = counts[priority];
+                countEl.textContent = `${count}/20`;
+                if (count >= 20) {
+                    countEl.style.color = '#e74c3c';
+                    countEl.style.fontWeight = 'bold';
+                } else {
+                    countEl.style.color = '';
+                    countEl.style.fontWeight = '';
+                }
+            }
         });
 
         // Show empty state if no tasks
@@ -73,27 +83,42 @@ const kanban = {
             statusBadges.push('<span class="status-badge in-progress">▶ В работе</span>');
         }
 
-        const assigneeHtml = task.assigned_to ? `
-            <div class="task-assignee">
-                <div class="assignee-avatar">${task.assigned_to.substring(0, 2).toUpperCase()}</div>
-                <span>Назначена</span>
-            </div>
-        ` : '<span style="color: #888;">Не назначена</span>';
+        // Get assignee username
+        let assigneeHtml = '';
+        if (task.assigned_to) {
+            const assignee = app.users.find(u => u.id === task.assigned_to);
+            const username = assignee ? assignee.username : 'Пользователь';
+            const initials = username.substring(0, 2).toUpperCase();
+            assigneeHtml = `
+                <div class="task-assignee-badge">
+                    <div class="assignee-avatar-small">${initials}</div>
+                    <span class="assignee-name">${this.escapeHtml(username)}</span>
+                </div>
+            `;
+        } else {
+            assigneeHtml = '<div class="task-assignee-badge unassigned">Не назначена</div>';
+        }
 
         const isTimerRunning = timer.isRunning(task.id);
         const timerHtml = isTimerRunning ? '<div class="task-timer"></div>' : '';
 
         card.innerHTML = `
+            ${assigneeHtml}
             <div class="task-header">
-                <div class="task-title">${this.escapeHtml(task.title)}</div>
+                <div class="task-title clickable" onclick="kanban.toggleComments('${task.id}')">
+                    <span class="expand-icon">▶</span> ${this.escapeHtml(task.title)}
+                </div>
                 <div class="task-status">${statusBadges.join('')}</div>
             </div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
+            <div class="task-comments-section" id="comments-${task.id}" style="display: none;">
+                <div class="comments-loading">Загрузка комментариев...</div>
+            </div>
             <div class="task-meta">
-                ${assigneeHtml}
                 ${timerHtml}
             </div>
             <div class="task-actions">
+                <button class="btn-edit" onclick="kanban.editTask('${task.id}')">✏️ Редактировать</button>
                 ${!task.assigned_to || task.assigned_to !== auth.currentUser.id ?
                     `<button class="btn-assign" onclick="kanban.assignToMe('${task.id}')">Взять</button>` : ''}
                 ${task.assigned_to === auth.currentUser.id && task.status !== 'completed' ? `
@@ -152,6 +177,16 @@ const kanban = {
 
     async updateTaskPriority(taskId, newPriority) {
         try {
+            // Check if target column has space
+            const tasksInColumn = this.tasks.filter(t =>
+                t.priority === newPriority && t.status !== 'archived' && t.id !== taskId
+            ).length;
+
+            if (tasksInColumn >= 20) {
+                alert('Колонка заполнена (максимум 20 задач)');
+                return;
+            }
+
             await api.updateTask(taskId, { priority: newPriority });
             await this.loadTasks();
         } catch (error) {
@@ -249,6 +284,70 @@ const kanban = {
         } catch (error) {
             console.error('Failed to delete task:', error);
             alert('Ошибка удаления задачи');
+        }
+    },
+
+    editTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        this.currentEditingTask = taskId;
+        document.getElementById('taskModalTitle').textContent = 'Редактировать задачу';
+        document.getElementById('taskTitle').value = task.title;
+        document.getElementById('taskDescription').value = task.description || '';
+        document.getElementById('taskPriority').value = task.priority;
+        app.populateAssigneeSelect();
+        document.getElementById('taskAssignee').value = task.assigned_to || '';
+        document.getElementById('taskModal').style.display = 'block';
+    },
+
+    async toggleComments(taskId) {
+        const commentsSection = document.getElementById(`comments-${taskId}`);
+        const expandIcon = event.target.closest('.task-title').querySelector('.expand-icon');
+
+        if (!commentsSection) return;
+
+        if (commentsSection.style.display === 'none') {
+            // Expand - load and show comments
+            commentsSection.style.display = 'block';
+            expandIcon.textContent = '▼';
+            await this.loadCommentsInline(taskId);
+        } else {
+            // Collapse
+            commentsSection.style.display = 'none';
+            expandIcon.textContent = '▶';
+        }
+    },
+
+    async loadCommentsInline(taskId) {
+        const commentsSection = document.getElementById(`comments-${taskId}`);
+        if (!commentsSection) return;
+
+        try {
+            const comments = await api.getComments(taskId);
+
+            if (comments.length === 0) {
+                commentsSection.innerHTML = '<div class="no-comments">Нет комментариев</div>';
+                return;
+            }
+
+            const commentsHtml = comments.map(comment => {
+                const date = new Date(comment.created_at).toLocaleString('ru-RU');
+                return `
+                    <div class="inline-comment">
+                        <div class="comment-header">
+                            <strong>${this.escapeHtml(comment.user_id)}</strong>
+                            <span class="comment-date">${date}</span>
+                        </div>
+                        <div class="comment-text">${this.escapeHtml(comment.text)}</div>
+                    </div>
+                `;
+            }).join('');
+
+            commentsSection.innerHTML = commentsHtml;
+        } catch (error) {
+            console.error('Failed to load comments:', error);
+            commentsSection.innerHTML = '<div class="error-comments">Ошибка загрузки комментариев</div>';
         }
     },
 

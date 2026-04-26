@@ -86,6 +86,13 @@ async def update_settings(
 ):
     return crud.update_user_settings(db, current_user.id, settings)
 
+@app.get("/users", response_model=List[schemas.User])
+async def get_users(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    return crud.get_all_users(db)
+
 # Task endpoints
 @app.get("/tasks", response_model=List[schemas.Task])
 async def get_tasks(
@@ -102,15 +109,20 @@ async def create_task(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_task = crud.create_task(db, task, current_user.id)
-    await manager.broadcast({
-        "type": "task_created",
-        "data": {
-            "task": schemas.Task.from_orm(db_task).dict(),
-            "user": {"id": current_user.id, "username": current_user.username}
-        }
-    })
-    return db_task
+    try:
+        db_task = crud.create_task(db, task, current_user.id)
+        await manager.broadcast({
+            "type": "task_created",
+            "data": {
+                "task": schemas.Task.from_orm(db_task).dict(),
+                "user": {"id": current_user.id, "username": current_user.username}
+            }
+        })
+        return db_task
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to create task")
 
 @app.get("/tasks/{task_id}", response_model=schemas.Task)
 async def get_task(

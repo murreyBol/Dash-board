@@ -82,6 +82,10 @@ const api = {
         return this.request('/users/me');
     },
 
+    async getUsers() {
+        return this.request('/users');
+    },
+
     async updateSettings(settings) {
         return this.request('/users/me/settings', {
             method: 'PUT',

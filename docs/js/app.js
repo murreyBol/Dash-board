@@ -1,14 +1,25 @@
 const app = {
+    users: [],
+
     async init() {
         const isAuthenticated = await auth.init();
 
         if (isAuthenticated) {
             this.showDashboard();
+            await this.loadUsers();
             await kanban.init();
             websocket.connect();
             await notifications.init();
         } else {
             this.showLogin();
+        }
+    },
+
+    async loadUsers() {
+        try {
+            this.users = await api.getUsers();
+        } catch (error) {
+            console.error('Failed to load users:', error);
         }
     },
 
@@ -79,8 +90,22 @@ const app = {
         document.getElementById('taskTitle').value = '';
         document.getElementById('taskDescription').value = '';
         document.getElementById('taskPriority').value = 'urgent';
+        this.populateAssigneeSelect();
+        document.getElementById('taskAssignee').value = '';
         kanban.currentEditingTask = null;
         document.getElementById('taskModal').style.display = 'block';
+    },
+
+    populateAssigneeSelect() {
+        const select = document.getElementById('taskAssignee');
+        select.innerHTML = '<option value="">Не назначена</option>';
+
+        this.users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.username;
+            select.appendChild(option);
+        });
     },
 
     closeTaskModal() {
@@ -91,17 +116,30 @@ const app = {
         const title = document.getElementById('taskTitle').value.trim();
         const description = document.getElementById('taskDescription').value.trim();
         const priority = document.getElementById('taskPriority').value;
+        const assignedTo = document.getElementById('taskAssignee').value || null;
 
         if (!title) {
             alert('Введите название задачи');
             return;
         }
 
+        // Check column limit for new tasks
+        if (!kanban.currentEditingTask) {
+            const tasksInColumn = kanban.tasks.filter(t =>
+                t.priority === priority && t.status !== 'archived'
+            ).length;
+
+            if (tasksInColumn >= 20) {
+                alert(`Колонка "${this.getPriorityName(priority)}" заполнена (максимум 20 задач). Выберите другой приоритет или удалите старые задачи.`);
+                return;
+            }
+        }
+
         try {
             if (kanban.currentEditingTask) {
-                await api.updateTask(kanban.currentEditingTask, { title, description, priority });
+                await api.updateTask(kanban.currentEditingTask, { title, description, priority, assigned_to: assignedTo });
             } else {
-                await api.createTask({ title, description, priority });
+                await api.createTask({ title, description, priority, assigned_to: assignedTo });
             }
 
             this.closeTaskModal();
@@ -110,6 +148,16 @@ const app = {
             console.error('Failed to save task:', error);
             alert('Ошибка сохранения задачи');
         }
+    },
+
+    getPriorityName(priority) {
+        const names = {
+            urgent: 'Срочная',
+            medium: 'Средняя срочность',
+            low: 'Малая срочность',
+            future: 'В будущем'
+        };
+        return names[priority] || priority;
     },
 
     // Settings Modal

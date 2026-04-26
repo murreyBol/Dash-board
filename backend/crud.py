@@ -26,6 +26,9 @@ def get_user_by_username(db: Session, username: str):
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 
+def get_all_users(db: Session):
+    return db.query(models.User).all()
+
 def update_user_settings(db: Session, user_id: str, settings: schemas.UserSettings):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user:
@@ -36,16 +39,25 @@ def update_user_settings(db: Session, user_id: str, settings: schemas.UserSettin
 
 # Task CRUD
 def create_task(db: Session, task: schemas.TaskCreate, user_id: str):
-    db_task = models.Task(
-        title=task.title,
-        description=task.description,
-        priority=task.priority,
-        created_by=user_id
-    )
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
-    return db_task
+    if not task.title or not task.title.strip():
+        raise ValueError("Task title is required")
+    if not user_id:
+        raise ValueError("User ID is required")
+
+    try:
+        db_task = models.Task(
+            title=task.title.strip(),
+            description=task.description.strip() if task.description else None,
+            priority=task.priority,
+            created_by=user_id
+        )
+        db.add(db_task)
+        db.commit()
+        db.refresh(db_task)
+        return db_task
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def get_tasks(db: Session, priority: Optional[str] = None, status: Optional[str] = None):
     query = db.query(models.Task)
@@ -59,23 +71,37 @@ def get_task(db: Session, task_id: str):
     return db.query(models.Task).filter(models.Task.id == task_id).first()
 
 def update_task(db: Session, task_id: str, task_update: schemas.TaskUpdate):
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if db_task:
-        update_data = task_update.dict(exclude_unset=True)
-        for key, value in update_data.items():
-            setattr(db_task, key, value)
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(db_task)
-    return db_task
+    if not task_id:
+        raise ValueError("Task ID is required")
+
+    try:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if db_task:
+            update_data = task_update.dict(exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(db_task, key, value)
+            db_task.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(db_task)
+        return db_task
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def delete_task(db: Session, task_id: str):
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if db_task:
-        db.delete(db_task)
-        db.commit()
-        return True
-    return False
+    if not task_id:
+        raise ValueError("Task ID is required")
+
+    try:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if db_task:
+            db.delete(db_task)
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def assign_task(db: Session, task_id: str, user_id: str):
     db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
