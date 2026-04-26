@@ -23,8 +23,7 @@ class User(UserBase):
     auto_start_timer: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 # Task schemas
 class TaskBase(BaseModel):
@@ -62,8 +61,7 @@ class OverdueTask(Task):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 # Comment schemas
 class CommentBase(BaseModel):
@@ -82,8 +80,7 @@ class Comment(CommentBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 # TimeSession schemas
 class TimeSessionBase(BaseModel):
@@ -99,8 +96,7 @@ class TimeSession(TimeSessionBase):
     ended_at: Optional[datetime] = None
     duration_seconds: int
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 # Token schemas
 class Token(BaseModel):

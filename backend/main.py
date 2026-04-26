@@ -111,17 +111,22 @@ async def create_task(
 ):
     try:
         db_task = crud.create_task(db, task, current_user.id)
-        await manager.broadcast({
-            "type": "task_created",
-            "data": {
-                "task": schemas.Task.from_orm(db_task).dict(),
-                "user": {"id": current_user.id, "username": current_user.username}
-            }
-        })
+        try:
+            await manager.broadcast({
+                "type": "task_created",
+                "data": {
+                    "task": schemas.Task.model_validate(db_task).model_dump(),
+                    "user": {"id": current_user.id, "username": current_user.username}
+                }
+            })
+        except Exception as broadcast_error:
+            # Log broadcast error but don't fail the request
+            print(f"WebSocket broadcast failed: {broadcast_error}")
         return db_task
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create task")
 
 @app.get("/tasks/{task_id}", response_model=schemas.Task)
@@ -145,10 +150,13 @@ async def update_task(
     db_task = crud.update_task(db, task_id, task_update)
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    await manager.broadcast({
-        "type": "task_updated",
-        "data": {"task": schemas.Task.from_orm(db_task).dict()}
-    })
+    try:
+        await manager.broadcast({
+            "type": "task_updated",
+            "data": {"task": schemas.Task.model_validate(db_task).model_dump()}
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return db_task
 
 @app.delete("/tasks/{task_id}")
@@ -178,14 +186,17 @@ async def assign_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
     assigned_user = db.query(models.User).filter(models.User.id == user_id).first()
-    await manager.broadcast({
-        "type": "task_assigned",
-        "data": {
-            "task": schemas.Task.from_orm(db_task).dict(),
-            "user": {"id": current_user.id, "username": current_user.username},
-            "assigned_to_me": user_id == current_user.id
-        }
-    })
+    try:
+        await manager.broadcast({
+            "type": "task_assigned",
+            "data": {
+                "task": schemas.Task.model_validate(db_task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username},
+                "assigned_to_me": user_id == current_user.id
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return db_task
 
 @app.post("/tasks/{task_id}/complete", response_model=schemas.Task)
@@ -197,13 +208,16 @@ async def complete_task(
     db_task = crud.complete_task(db, task_id)
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    await manager.broadcast({
-        "type": "task_completed",
-        "data": {
-            "task": schemas.Task.from_orm(db_task).dict(),
-            "user": {"id": current_user.id, "username": current_user.username}
-        }
-    })
+    try:
+        await manager.broadcast({
+            "type": "task_completed",
+            "data": {
+                "task": schemas.Task.model_validate(db_task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username}
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return db_task
 
 @app.post("/tasks/{task_id}/postpone", response_model=schemas.Task)
@@ -216,14 +230,17 @@ async def postpone_task(
     db_task = crud.postpone_task(db, task_id, postpone_data.reason)
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    await manager.broadcast({
-        "type": "task_postponed",
-        "data": {
-            "task": schemas.Task.from_orm(db_task).dict(),
-            "user": {"id": current_user.id, "username": current_user.username},
-            "reason": postpone_data.reason
-        }
-    })
+    try:
+        await manager.broadcast({
+            "type": "task_postponed",
+            "data": {
+                "task": schemas.Task.model_validate(db_task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username},
+                "reason": postpone_data.reason
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return db_task
 
 @app.post("/tasks/{task_id}/archive", response_model=schemas.Task)
@@ -260,13 +277,16 @@ async def start_timer(
 ):
     session = crud.start_timer(db, task_id, current_user.id)
     task = crud.get_task(db, task_id)
-    await manager.broadcast({
-        "type": "timer_started",
-        "data": {
-            "task": schemas.Task.from_orm(task).dict(),
-            "user": {"id": current_user.id, "username": current_user.username}
-        }
-    })
+    try:
+        await manager.broadcast({
+            "type": "timer_started",
+            "data": {
+                "task": schemas.Task.model_validate(task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username}
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return session
 
 @app.post("/tasks/{task_id}/stop-timer", response_model=schemas.TimeSession)
@@ -279,14 +299,17 @@ async def stop_timer(
     if not session:
         raise HTTPException(status_code=404, detail="No active timer found")
     task = crud.get_task(db, task_id)
-    await manager.broadcast({
-        "type": "timer_stopped",
-        "data": {
-            "task": schemas.Task.from_orm(task).dict(),
-            "user": {"id": current_user.id, "username": current_user.username},
-            "duration": session.duration_seconds
-        }
-    })
+    try:
+        await manager.broadcast({
+            "type": "timer_stopped",
+            "data": {
+                "task": schemas.Task.model_validate(task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username},
+                "duration": session.duration_seconds
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return session
 
 # Comment endpoints
@@ -307,15 +330,18 @@ async def create_comment(
 ):
     db_comment = crud.create_comment(db, task_id, current_user.id, comment)
     task = crud.get_task(db, task_id)
-    await manager.broadcast({
-        "type": "comment_added",
-        "data": {
-            "comment": schemas.Comment.from_orm(db_comment).dict(),
-            "task": schemas.Task.from_orm(task).dict(),
-            "user": {"id": current_user.id, "username": current_user.username},
-            "is_my_task": task.created_by == current_user.id or task.assigned_to == current_user.id
-        }
-    })
+    try:
+        await manager.broadcast({
+            "type": "comment_added",
+            "data": {
+                "comment": schemas.Comment.model_validate(db_comment).model_dump(),
+                "task": schemas.Task.model_validate(task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username},
+                "is_my_task": task.created_by == current_user.id or task.assigned_to == current_user.id
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return db_comment
 
 @app.put("/comments/{comment_id}", response_model=schemas.Comment)
@@ -330,13 +356,16 @@ async def update_comment(
         raise HTTPException(status_code=404, detail="Comment not found")
     if db_comment.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this comment")
-    await manager.broadcast({
-        "type": "comment_updated",
-        "data": {
-            "comment": schemas.Comment.from_orm(db_comment).dict(),
-            "task_id": db_comment.task_id
-        }
-    })
+    try:
+        await manager.broadcast({
+            "type": "comment_updated",
+            "data": {
+                "comment": schemas.Comment.model_validate(db_comment).model_dump(),
+                "task_id": db_comment.task_id
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
     return db_comment
 
 @app.delete("/comments/{comment_id}")
