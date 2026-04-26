@@ -100,6 +100,18 @@ const api = {
         });
     },
 
+    async deleteUser(userId) {
+        return this.request(`/users/${userId}`, {
+            method: 'DELETE'
+        });
+    },
+
+    async toggleAdmin(userId) {
+        return this.request(`/users/${userId}/admin`, {
+            method: 'PUT'
+        });
+    },
+
     // Tasks
     async getTasks(priority = null, status = null) {
         let url = '/tasks';

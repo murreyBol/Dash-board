@@ -15,6 +15,40 @@ from database import engine, get_db
 # Create tables
 models.Base.metadata.create_all(bind=engine)
 
+# Run migration to add is_admin field
+def run_migration():
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            # Check if column exists
+            result = conn.execute(text("""
+                SELECT COUNT(*)
+                FROM pragma_table_info('users')
+                WHERE name='is_admin'
+            """))
+
+            if result.scalar() == 0:
+                print("Adding is_admin column to users table...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+                conn.commit()
+                print("✓ Column added successfully")
+
+                # Make first user admin
+                print("Setting first user as admin...")
+                conn.execute(text("""
+                    UPDATE users
+                    SET is_admin = 1
+                    WHERE id = (SELECT id FROM users ORDER BY created_at LIMIT 1)
+                """))
+                conn.commit()
+                print("✓ First user is now admin")
+            else:
+                print("✓ Column is_admin already exists")
+        except Exception as e:
+            print(f"Migration error (may be safe to ignore): {e}")
+
+run_migration()
+
 app = FastAPI(title="Task Planner API")
 
 # CORS
@@ -92,6 +126,48 @@ async def get_users(
     db: Session = Depends(get_db)
 ):
     return crud.get_all_users(db)
+
+@app.delete("/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can delete users")
+
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted successfully"}
+
+@app.put("/users/{user_id}/admin")
+async def toggle_admin(
+    user_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can manage admin rights")
+
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot change your own admin status")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.is_admin = not user.is_admin
+    db.commit()
+    db.refresh(user)
+    return user
+
 
 # Task endpoints
 @app.get("/tasks", response_model=List[schemas.Task])

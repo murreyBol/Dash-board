@@ -36,6 +36,7 @@
             <h1>Task Planner Dashboard</h1>
             <div class="header-actions">
                 <span id="currentUser"></span>
+                <button id="adminBtn" onclick="app.showAdminPanel()" style="display: none;">👑 Админка</button>
                 <button onclick="app.showSettings()">⚙️ Настройки</button>
                 <button onclick="app.showCalendar()">📅 Календарь</button>
                 <button onclick="app.showOverdue()">⏰ Просрочка</button>
@@ -169,6 +170,15 @@
             <span class="close" onclick="app.closeOverdueModal()">&times;</span>
             <h2>⏰ Просроченные задачи</h2>
             <div id="overdueList"></div>
+        </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content large">
+            <span class="close" onclick="app.closeAdminModal()">&times;</span>
+            <h2>👑 Панель администратора</h2>
+            <div id="adminUserList"></div>
         </div>
     </div>
 

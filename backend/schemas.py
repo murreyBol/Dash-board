@@ -21,6 +21,7 @@ class UserSettings(BaseModel):
 class User(UserBase):
     id: str
     auto_start_timer: bool
+    is_admin: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

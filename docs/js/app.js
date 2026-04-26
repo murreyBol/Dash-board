@@ -39,6 +39,14 @@ const app = {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('dashboardScreen').style.display = 'block';
         document.getElementById('currentUser').textContent = auth.currentUser.username;
+
+        // Show admin button only for admins
+        const adminBtn = document.getElementById('adminBtn');
+        if (auth.currentUser.is_admin) {
+            adminBtn.style.display = 'inline-block';
+        } else {
+            adminBtn.style.display = 'none';
+        }
     },
 
     async login() {
@@ -281,6 +289,95 @@ const app = {
     // Postpone Modal
     closePostponeModal() {
         kanban.closePostponeModal();
+    },
+
+    // Admin Panel
+    async showAdminPanel() {
+        try {
+            const users = await api.getUsers();
+            this.renderAdminPanel(users);
+            document.getElementById('adminModal').style.display = 'block';
+        } catch (error) {
+            console.error('Failed to load admin panel:', error);
+            alert('Ошибка загрузки админ-панели');
+        }
+    },
+
+    closeAdminModal() {
+        document.getElementById('adminModal').style.display = 'none';
+    },
+
+    renderAdminPanel(users) {
+        const container = document.getElementById('adminUserList');
+
+        if (users.length === 0) {
+            container.innerHTML = '<p style="color: #888; text-align: center;">Нет пользователей</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #0d7377;">
+                        <th style="padding: 12px; text-align: left;">Пользователь</th>
+                        <th style="padding: 12px; text-align: left;">Email</th>
+                        <th style="padding: 12px; text-align: center;">Роль</th>
+                        <th style="padding: 12px; text-align: center;">Дата регистрации</th>
+                        <th style="padding: 12px; text-align: center;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${users.map(user => {
+                        const isCurrentUser = user.id === auth.currentUser.id;
+                        const date = new Date(user.created_at).toLocaleDateString('ru-RU');
+                        return `
+                            <tr style="border-bottom: 1px solid #0f3460;">
+                                <td style="padding: 12px;">${this.escapeHtml(user.username)}</td>
+                                <td style="padding: 12px;">${this.escapeHtml(user.email)}</td>
+                                <td style="padding: 12px; text-align: center;">
+                                    ${user.is_admin ? '<span style="color: #f39c12;">👑 Админ</span>' : '<span style="color: #95a5a6;">Пользователь</span>'}
+                                </td>
+                                <td style="padding: 12px; text-align: center;">${date}</td>
+                                <td style="padding: 12px; text-align: center;">
+                                    ${!isCurrentUser ? `
+                                        <button onclick="app.toggleUserAdmin('${user.id}')" style="margin-right: 8px; padding: 6px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                            ${user.is_admin ? 'Снять админа' : 'Сделать админом'}
+                                        </button>
+                                        <button onclick="app.deleteUser('${user.id}')" style="padding: 6px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                            Удалить
+                                        </button>
+                                    ` : '<span style="color: #95a5a6;">Вы</span>'}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+    },
+
+    async toggleUserAdmin(userId) {
+        if (!confirm('Изменить права администратора для этого пользователя?')) return;
+
+        try {
+            await api.toggleAdmin(userId);
+            await this.showAdminPanel(); // Refresh
+        } catch (error) {
+            console.error('Failed to toggle admin:', error);
+            alert('Ошибка изменения прав: ' + error.message);
+        }
+    },
+
+    async deleteUser(userId) {
+        if (!confirm('Вы уверены что хотите удалить этого пользователя? Это действие необратимо!')) return;
+
+        try {
+            await api.deleteUser(userId);
+            await this.showAdminPanel(); // Refresh
+        } catch (error) {
+            console.error('Failed to delete user:', error);
+            alert('Ошибка удаления пользователя: ' + error.message);
+        }
     },
 
     escapeHtml(text) {
