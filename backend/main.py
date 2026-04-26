@@ -20,16 +20,16 @@ def run_migration():
     from sqlalchemy import text
     with engine.connect() as conn:
         try:
-            # Check if column exists
+            # Check if column exists (PostgreSQL syntax)
             result = conn.execute(text("""
                 SELECT COUNT(*)
-                FROM pragma_table_info('users')
-                WHERE name='is_admin'
+                FROM information_schema.columns
+                WHERE table_name='users' AND column_name='is_admin'
             """))
 
             if result.scalar() == 0:
                 print("Adding is_admin column to users table...")
-                conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
                 conn.commit()
                 print("✓ Column added successfully")
 
@@ -37,7 +37,7 @@ def run_migration():
             print("Setting Viktor as admin...")
             result = conn.execute(text("""
                 UPDATE users
-                SET is_admin = 1
+                SET is_admin = TRUE
                 WHERE username = 'Viktor'
             """))
             conn.commit()
