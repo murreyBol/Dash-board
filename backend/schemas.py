@@ -33,7 +33,7 @@ class TaskBase(BaseModel):
     priority: PriorityEnum
 
 class TaskCreate(TaskBase):
-    pass
+    assigned_to: Optional[str] = None
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None

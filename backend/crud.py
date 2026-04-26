@@ -49,7 +49,8 @@ def create_task(db: Session, task: schemas.TaskCreate, user_id: str):
             title=task.title.strip(),
             description=task.description.strip() if task.description else None,
             priority=task.priority,
-            created_by=user_id
+            created_by=user_id,
+            assigned_to=task.assigned_to
         )
         db.add(db_task)
         db.commit()
