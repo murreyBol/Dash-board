@@ -78,6 +78,7 @@ class Comment(CommentBase):
     id: str
     task_id: str
     user_id: str
+    username: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

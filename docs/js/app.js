@@ -286,11 +286,6 @@ const app = {
         comments.close();
     },
 
-    // Postpone Modal
-    closePostponeModal() {
-        kanban.closePostponeModal();
-    },
-
     // Admin Panel
     async showAdminPanel() {
         try {

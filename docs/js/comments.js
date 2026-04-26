@@ -34,11 +34,12 @@ const comments = {
         container.innerHTML = commentsList.map(comment => {
             const date = new Date(comment.created_at).toLocaleString('ru-RU');
             const isOwner = comment.user_id === auth.currentUser.id;
+            const username = comment.username || 'Пользователь';
 
             return `
                 <div class="comment-item" data-comment-id="${comment.id}">
                     <div class="comment-header">
-                        <span class="comment-author">Пользователь ${comment.user_id.substring(0, 8)}</span>
+                        <span class="comment-author">${this.escapeHtml(username)}</span>
                         <span class="comment-date">${date}</span>
                     </div>
                     <div class="comment-text">${this.escapeHtml(comment.text)}</div>

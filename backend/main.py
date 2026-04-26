@@ -407,7 +407,12 @@ async def get_comments(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    return crud.get_comments(db, task_id)
+    comments = crud.get_comments(db, task_id)
+    # Add username to each comment
+    for comment in comments:
+        user = db.query(models.User).filter(models.User.id == comment.user_id).first()
+        comment.username = user.username if user else "Unknown"
+    return comments
 
 @app.post("/tasks/{task_id}/comments", response_model=schemas.Comment)
 async def create_comment(

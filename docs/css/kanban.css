@@ -125,10 +125,6 @@
     color: #2ecc71;
 }
 
-.status-badge.postponed {
-    background: rgba(241, 196, 15, 0.2);
-    color: #f1c40f;
-}
 
 .status-badge.in-progress {
     background: rgba(52, 152, 219, 0.2);
@@ -228,14 +224,6 @@
     background: #27ae60;
 }
 
-.btn-postpone {
-    background: #f39c12;
-    color: #fff;
-}
-
-.btn-postpone:hover {
-    background: #e67e22;
-}
 
 .btn-comments {
     background: #9b59b6;

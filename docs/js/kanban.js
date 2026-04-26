@@ -76,9 +76,6 @@ const kanban = {
         if (task.status === 'completed') {
             statusBadges.push('<span class="status-badge completed">✓ Выполнен</span>');
         }
-        if (task.status === 'postponed') {
-            statusBadges.push('<span class="status-badge postponed">⏸ Отложен</span>');
-        }
         if (task.status === 'in_progress') {
             statusBadges.push('<span class="status-badge in-progress">▶ В работе</span>');
         }
@@ -128,8 +125,6 @@ const kanban = {
                 ` : ''}
                 ${task.status !== 'completed' ?
                     `<button class="btn-complete" onclick="kanban.completeTask('${task.id}')">✓ Выполнить</button>` : ''}
-                ${task.status !== 'postponed' && task.status !== 'completed' ?
-                    `<button class="btn-postpone" onclick="kanban.showPostponeModal('${task.id}')">⏸ Отложить</button>` : ''}
                 <button class="btn-comments" onclick="comments.show('${task.id}')">💬 Комментарии</button>
                 <button class="btn-archive" onclick="kanban.archiveTask('${task.id}')">📦 Архив</button>
                 <button class="btn-delete" onclick="kanban.deleteTask('${task.id}')">✕</button>
@@ -235,34 +230,6 @@ const kanban = {
         }
     },
 
-    showPostponeModal(taskId) {
-        this.currentPostponeTask = taskId;
-        document.getElementById('postponeModal').style.display = 'block';
-    },
-
-    async postponeTask() {
-        const reason = document.getElementById('postponeReason').value.trim();
-        if (!reason) {
-            alert('Укажите причину отложения');
-            return;
-        }
-
-        try {
-            await api.postponeTask(this.currentPostponeTask, reason);
-            this.closePostponeModal();
-            await this.loadTasks();
-        } catch (error) {
-            console.error('Failed to postpone task:', error);
-            alert('Ошибка отложения задачи');
-        }
-    },
-
-    closePostponeModal() {
-        this.currentPostponeTask = null;
-        document.getElementById('postponeModal').style.display = 'none';
-        document.getElementById('postponeReason').value = '';
-    },
-
     async archiveTask(taskId) {
         if (!confirm('Архивировать задачу?')) return;
 
@@ -333,10 +300,11 @@ const kanban = {
 
             const commentsHtml = comments.map(comment => {
                 const date = new Date(comment.created_at).toLocaleString('ru-RU');
+                const username = comment.username || 'Пользователь';
                 return `
                     <div class="inline-comment">
                         <div class="comment-header">
-                            <strong>${this.escapeHtml(comment.user_id)}</strong>
+                            <strong>${this.escapeHtml(username)}</strong>
                             <span class="comment-date">${date}</span>
                         </div>
                         <div class="comment-text">${this.escapeHtml(comment.text)}</div>

@@ -35,11 +35,11 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    created_tasks = relationship("Task", back_populates="creator", foreign_keys="Task.created_by")
-    assigned_tasks = relationship("Task", back_populates="assignee", foreign_keys="Task.assigned_to")
-    comments = relationship("Comment", back_populates="user")
-    time_sessions = relationship("TimeSession", back_populates="user")
-    task_assignments = relationship("TaskAssignment", back_populates="user")
+    created_tasks = relationship("Task", back_populates="creator", foreign_keys="Task.created_by", cascade="all, delete-orphan")
+    assigned_tasks = relationship("Task", back_populates="assignee", foreign_keys="Task.assigned_to", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
+    time_sessions = relationship("TimeSession", back_populates="user", cascade="all, delete-orphan")
+    task_assignments = relationship("TaskAssignment", back_populates="user", cascade="all, delete-orphan")
 
 class Task(Base):
     __tablename__ = "tasks"
