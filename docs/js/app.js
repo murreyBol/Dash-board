@@ -136,17 +136,20 @@ const app = {
         }
 
         try {
+            let result;
             if (kanban.currentEditingTask) {
-                await api.updateTask(kanban.currentEditingTask, { title, description, priority, assigned_to: assignedTo });
+                result = await api.updateTask(kanban.currentEditingTask, { title, description, priority, assigned_to: assignedTo });
             } else {
-                await api.createTask({ title, description, priority, assigned_to: assignedTo });
+                result = await api.createTask({ title, description, priority, assigned_to: assignedTo });
             }
 
+            console.log('Task saved successfully:', result);
             this.closeTaskModal();
             await kanban.loadTasks();
         } catch (error) {
             console.error('Failed to save task:', error);
-            alert('Ошибка сохранения задачи');
+            console.error('Error details:', error.message, error.stack);
+            alert('Ошибка сохранения задачи: ' + error.message);
         }
     },
 

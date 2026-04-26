@@ -26,12 +26,16 @@ const api = {
         }
 
         try {
+            console.log('API Request:', endpoint, options);
             const response = await fetch(`${API_URL}${endpoint}`, {
                 ...options,
                 headers
             });
 
+            console.log('API Response status:', response.status);
+
             if (response.status === 401) {
+                console.error('401 Unauthorized - clearing token');
                 this.clearToken();
                 window.location.reload();
                 return null;
@@ -39,10 +43,13 @@ const api = {
 
             if (!response.ok) {
                 const error = await response.json();
+                console.error('API Error response:', error);
                 throw new Error(error.detail || 'Request failed');
             }
 
-            return await response.json();
+            const data = await response.json();
+            console.log('API Response data:', data);
+            return data;
         } catch (error) {
             console.error('API Error:', error);
             throw error;

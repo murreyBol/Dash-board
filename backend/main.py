@@ -110,7 +110,9 @@ async def create_task(
     db: Session = Depends(get_db)
 ):
     try:
+        print(f"Creating task: {task.dict()}")
         db_task = crud.create_task(db, task, current_user.id)
+        print(f"Task created successfully: {db_task.id}")
         try:
             await manager.broadcast({
                 "type": "task_created",
@@ -119,15 +121,20 @@ async def create_task(
                     "user": {"id": current_user.id, "username": current_user.username}
                 }
             })
+            print("Broadcast sent successfully")
         except Exception as broadcast_error:
             # Log broadcast error but don't fail the request
             print(f"WebSocket broadcast failed: {broadcast_error}")
         return db_task
     except ValueError as e:
+        print(f"ValueError in create_task: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"Exception in create_task: {e}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to create task")
+        raise HTTPException(status_code=500, detail=f"Failed to create task: {str(e)}")
 
 @app.get("/tasks/{task_id}", response_model=schemas.Task)
 async def get_task(
