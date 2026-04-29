@@ -8,8 +8,21 @@
     <link rel="stylesheet" href="css/kanban.css">
 </head>
 <body>
+    <!-- Pin Code Screen -->
+    <div id="pinScreen" class="screen">
+        <div class="login-container">
+            <h1>Task Planner</h1>
+            <div id="pinForm">
+                <h2>Введите PIN-код</h2>
+                <input type="password" id="pinCode" placeholder="PIN-код" maxlength="10" onkeypress="if(event.key==='Enter') app.checkPin()" />
+                <button onclick="app.checkPin()">Войти</button>
+                <p id="pinError" style="color: red; display: none;">Неверный PIN-код</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Login Screen -->
-    <div id="loginScreen" class="screen">
+    <div id="loginScreen" class="screen" style="display: none;">
         <div class="login-container">
             <h1>Task Planner</h1>
             <div id="loginForm">
@@ -154,6 +167,14 @@
         </div>
     </div>
 
+    <!-- Task Detail Modal -->
+    <div id="taskDetailModal" class="modal">
+        <div class="modal-content large">
+            <span class="close" onclick="app.closeTaskDetailModal()">&times;</span>
+            <div id="taskDetailContent"></div>
+        </div>
+    </div>
+
     <!-- Overdue Modal -->
     <div id="overdueModal" class="modal">
         <div class="modal-content">
@@ -168,7 +189,25 @@
         <div class="modal-content large">
             <span class="close" onclick="app.closeAdminModal()">&times;</span>
             <h2>👑 Панель администратора</h2>
-            <div id="adminUserList"></div>
+
+            <!-- Pin Code Management -->
+            <div class="admin-section">
+                <h3>🔐 Управление PIN-кодом</h3>
+                <div class="pin-management">
+                    <p>Текущий PIN-код: <strong id="currentPin">****</strong></p>
+                    <div style="margin-top: 15px;">
+                        <input type="text" id="newPinCode" placeholder="Новый PIN-код" maxlength="10" style="width: 200px; margin-right: 10px;" />
+                        <button onclick="app.updatePinCode()" style="background: #0d7377; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Изменить PIN</button>
+                    </div>
+                    <p style="color: #888; font-size: 12px; margin-top: 8px;">PIN-код используется для доступа к сайту</p>
+                </div>
+            </div>
+
+            <!-- User Management -->
+            <div class="admin-section">
+                <h3>👥 Управление пользователями</h3>
+                <div id="adminUserList"></div>
+            </div>
         </div>
     </div>
 

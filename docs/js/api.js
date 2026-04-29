@@ -93,6 +93,17 @@ const api = {
         return this.request('/users');
     },
 
+    async getPinCode() {
+        return this.request('/admin/pin-code');
+    },
+
+    async updatePinCode(pinCode) {
+        return this.request('/admin/pin-code', {
+            method: 'POST',
+            body: JSON.stringify({ pin_code: pinCode })
+        });
+    },
+
     async updateSettings(settings) {
         return this.request('/users/me/settings', {
             method: 'PUT',
@@ -120,6 +131,10 @@ const api = {
         if (status) params.append('status', status);
         if (params.toString()) url += `?${params.toString()}`;
         return this.request(url);
+    },
+
+    async getTask(taskId) {
+        return this.request(`/tasks/${taskId}`);
     },
 
     async createTask(task) {

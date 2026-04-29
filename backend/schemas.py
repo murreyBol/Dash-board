@@ -3,6 +3,10 @@ from typing import Optional, List
 from datetime import datetime
 from models import PriorityEnum, StatusEnum
 
+# Pin code schema
+class PinCodeCheck(BaseModel):
+    pin_code: str
+
 # User schemas
 class UserBase(BaseModel):
     username: str

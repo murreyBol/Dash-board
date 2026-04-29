@@ -5,12 +5,16 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import List, Optional
 import json
+import os
 
 import models
 import schemas
 import crud
 import auth
 from database import engine, get_db
+
+# Get PIN code from environment variable
+SITE_PIN_CODE = os.getenv("SITE_PIN_CODE", "1234")  # Default for development
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -119,6 +123,35 @@ class ConnectionManager:
                 pass
 
 manager = ConnectionManager()
+
+# Pin code endpoint
+@app.post("/auth/check-pin")
+def check_pin(pin_data: schemas.PinCodeCheck):
+    if pin_data.pin_code == SITE_PIN_CODE:
+        return {"success": True, "message": "Pin code correct"}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid pin code")
+
+@app.get("/admin/pin-code")
+def get_pin_code(current_user: models.User = Depends(auth.get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return {"pin_code": SITE_PIN_CODE}
+
+@app.post("/admin/pin-code")
+def update_pin_code(
+    pin_data: schemas.PinCodeCheck,
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    global SITE_PIN_CODE
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    if not pin_data.pin_code or len(pin_data.pin_code) < 4:
+        raise HTTPException(status_code=400, detail="Pin code must be at least 4 characters")
+
+    SITE_PIN_CODE = pin_data.pin_code
+    return {"success": True, "message": "Pin code updated", "pin_code": SITE_PIN_CODE}
 
 # Auth endpoints
 @app.post("/auth/register", response_model=schemas.User)

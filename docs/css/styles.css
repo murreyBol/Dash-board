@@ -574,3 +574,143 @@ header h1 {
 .calendar-day.today:hover {
     background: #0a5a5d;
 }
+
+/* Archive Cards */
+#archiveList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+}
+
+.archive-card {
+    background: #16213e;
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.archive-card:hover {
+    transform: translateY(-4px);
+    border-color: #0d7377;
+    box-shadow: 0 8px 16px rgba(13, 115, 119, 0.3);
+}
+
+.archive-card h3 {
+    color: #14ffec;
+    margin-bottom: 12px;
+    font-size: 18px;
+}
+
+.archive-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: #aaa;
+    font-size: 14px;
+}
+
+.archive-meta span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Task Detail Modal */
+.task-detail-info {
+    background: #0f1624;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.task-detail-info p {
+    margin: 12px 0;
+    line-height: 1.6;
+}
+
+.task-detail-comments {
+    margin-top: 30px;
+}
+
+.task-detail-comments h3 {
+    color: #14ffec;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #0d7377;
+}
+
+.detail-comment {
+    background: #0f1624;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 3px solid #0d7377;
+}
+
+.detail-comment .comment-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    color: #14ffec;
+}
+
+.detail-comment .comment-date {
+    color: #888;
+    font-size: 12px;
+}
+
+.detail-comment .comment-text {
+    color: #ddd;
+    line-height: 1.6;
+}
+
+/* Admin Panel Sections */
+.admin-section {
+    background: #0f1624;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #0d7377;
+}
+
+.admin-section h3 {
+    color: #14ffec;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+.pin-management {
+    padding: 15px;
+    background: #16213e;
+    border-radius: 6px;
+}
+
+.pin-management p {
+    margin: 10px 0;
+}
+
+.pin-management strong {
+    color: #14ffec;
+    font-size: 18px;
+}
+
+.pin-management input {
+    background: #0f1624;
+    border: 2px solid #0d7377;
+    color: #eee;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.pin-management input:focus {
+    outline: none;
+    border-color: #14ffec;
+}
+
+.pin-management button:hover {
+    background: #0a5a5d !important;
+}

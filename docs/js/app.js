@@ -2,6 +2,14 @@ const app = {
     users: [],
 
     async init() {
+        // Check if pin code is verified
+        const pinVerified = localStorage.getItem('pin_verified');
+
+        if (!pinVerified) {
+            this.showPinScreen();
+            return;
+        }
+
         const isAuthenticated = await auth.init();
 
         if (isAuthenticated) {
@@ -12,6 +20,47 @@ const app = {
             await notifications.init();
         } else {
             this.showLogin();
+        }
+    },
+
+    showPinScreen() {
+        document.getElementById('pinScreen').style.display = 'block';
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('dashboardScreen').style.display = 'none';
+    },
+
+    async checkPin() {
+        const pinCode = document.getElementById('pinCode').value.trim();
+        const pinError = document.getElementById('pinError');
+
+        if (!pinCode) {
+            pinError.textContent = 'Введите PIN-код';
+            pinError.style.display = 'block';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${api.baseUrl}/auth/check-pin`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ pin_code: pinCode })
+            });
+
+            if (response.ok) {
+                localStorage.setItem('pin_verified', 'true');
+                document.getElementById('pinScreen').style.display = 'none';
+                this.showLogin();
+            } else {
+                pinError.textContent = 'Неверный PIN-код';
+                pinError.style.display = 'block';
+                document.getElementById('pinCode').value = '';
+            }
+        } catch (error) {
+            console.error('Pin check error:', error);
+            pinError.textContent = 'Ошибка проверки PIN-кода';
+            pinError.style.display = 'block';
         }
     },
 
@@ -278,18 +327,13 @@ const app = {
             const assigneeName = assignee ? assignee.username : 'Не назначена';
 
             return `
-                <div class="archive-item">
+                <div class="archive-card" onclick="app.showTaskDetail('${task.id}')">
                     <h3>${this.escapeHtml(task.title)}</h3>
-                    <p>${this.escapeHtml(task.description || 'Нет описания')}</p>
-                    <p style="margin-top: 8px;"><strong>Дата выполнения:</strong> ${date}</p>
-                    <p style="margin-top: 4px;"><strong>Затраченное время:</strong> ${timeSpent}</p>
-                    <p style="margin-top: 4px;"><strong>Исполнитель:</strong> ${this.escapeHtml(assigneeName)}</p>
-                    <div style="margin-top: 12px;">
-                        <strong>Комментарии:</strong>
-                        <div id="archive-comments-${task.id}" style="margin-top: 8px;">
-                            <button onclick="app.loadArchiveComments('${task.id}')" style="padding: 6px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">Показать комментарии</button>
-                        </div>
-                    </div>
+                    <p class="archive-meta">
+                        <span>📅 ${date}</span>
+                        <span>⏱️ ${timeSpent}</span>
+                        <span>👤 ${this.escapeHtml(assigneeName)}</span>
+                    </p>
                 </div>
             `;
         }).join('');
@@ -302,6 +346,62 @@ const app = {
         if (hours > 0) return `${hours}ч ${minutes}мин`;
         if (minutes > 0) return `${minutes}мин`;
         return `${seconds}сек`;
+    },
+
+    async showTaskDetail(taskId) {
+        try {
+            // Get task details
+            const task = await api.getTask(taskId);
+            const comments = await api.getComments(taskId);
+
+            const date = new Date(task.completed_at || task.archived_at).toLocaleDateString('ru-RU');
+            const timeSpent = this.formatTimeSpent(task.total_time_seconds || 0);
+            const assignee = app.users.find(u => u.id === task.assigned_to);
+            const assigneeName = assignee ? assignee.username : 'Не назначена';
+
+            // Render task detail modal
+            const detailContainer = document.getElementById('taskDetailContent');
+            detailContainer.innerHTML = `
+                <h2>${this.escapeHtml(task.title)}</h2>
+                <div class="task-detail-info">
+                    <p><strong>Описание:</strong> ${this.escapeHtml(task.description || 'Нет описания')}</p>
+                    <p><strong>Дата выполнения:</strong> ${date}</p>
+                    <p><strong>Затраченное время:</strong> ${timeSpent}</p>
+                    <p><strong>Исполнитель:</strong> ${this.escapeHtml(assigneeName)}</p>
+                </div>
+                <div class="task-detail-comments">
+                    <h3>Комментарии и история</h3>
+                    ${comments.length === 0 ? '<p style="color: #888;">Нет комментариев</p>' : ''}
+                    ${comments.map(comment => {
+                        const commentDate = new Date(comment.created_at).toLocaleString('ru-RU');
+                        const username = comment.username || 'Пользователь';
+                        let timeInfo = '';
+                        if (comment.session_duration) {
+                            const duration = timer.formatDuration(comment.session_duration);
+                            timeInfo = ` <span style="color: #3498db;">(Время: ${duration})</span>`;
+                        }
+                        return `
+                            <div class="detail-comment">
+                                <div class="comment-header">
+                                    <strong>${this.escapeHtml(username)}</strong>
+                                    <span class="comment-date">${commentDate}</span>
+                                </div>
+                                <div class="comment-text">${this.escapeHtml(comment.text)}${timeInfo}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+
+            document.getElementById('taskDetailModal').style.display = 'block';
+        } catch (error) {
+            console.error('Failed to load task details:', error);
+            alert('Ошибка загрузки деталей задачи');
+        }
+    },
+
+    closeTaskDetailModal() {
+        document.getElementById('taskDetailModal').style.display = 'none';
     },
 
     async loadArchiveComments(taskId) {
@@ -347,11 +447,45 @@ const app = {
     async showAdminPanel() {
         try {
             const users = await api.getUsers();
+
+            // Load current pin code
+            try {
+                const pinData = await api.getPinCode();
+                document.getElementById('currentPin').textContent = pinData.pin_code;
+            } catch (error) {
+                console.error('Failed to load pin code:', error);
+                document.getElementById('currentPin').textContent = '****';
+            }
+
             this.renderAdminPanel(users);
             document.getElementById('adminModal').style.display = 'block';
         } catch (error) {
             console.error('Failed to load admin panel:', error);
             alert('Ошибка загрузки админ-панели');
+        }
+    },
+
+    async updatePinCode() {
+        const newPin = document.getElementById('newPinCode').value.trim();
+
+        if (!newPin) {
+            alert('Введите новый PIN-код');
+            return;
+        }
+
+        if (newPin.length < 4) {
+            alert('PIN-код должен содержать минимум 4 символа');
+            return;
+        }
+
+        try {
+            const result = await api.updatePinCode(newPin);
+            document.getElementById('currentPin').textContent = result.pin_code;
+            document.getElementById('newPinCode').value = '';
+            alert('PIN-код успешно изменён!');
+        } catch (error) {
+            console.error('Failed to update pin code:', error);
+            alert('Ошибка изменения PIN-кода');
         }
     },
 
