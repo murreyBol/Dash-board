@@ -24,6 +24,13 @@ const comments = {
 
         // Hide comments list, show only input
         document.getElementById('commentsList').style.display = 'none';
+
+        // Show skip button
+        const skipBtn = document.getElementById('skipCommentBtn');
+        if (skipBtn) {
+            skipBtn.style.display = 'block';
+        }
+
         document.getElementById('commentsModal').style.display = 'block';
 
         // Focus on textarea
@@ -40,6 +47,12 @@ const comments = {
         document.getElementById('commentsList').innerHTML = '';
         document.getElementById('commentsList').style.display = 'block';
         document.getElementById('newComment').value = '';
+
+        // Hide skip button
+        const skipBtn = document.getElementById('skipCommentBtn');
+        if (skipBtn) {
+            skipBtn.style.display = 'none';
+        }
 
         // Reset modal title
         const modalTitle = document.querySelector('#commentsModal h2');
@@ -98,16 +111,21 @@ const comments = {
             document.getElementById('newComment').value = '';
 
             if (this.isCompletionMode) {
-                // Close modal and reload tasks to show new comment
-                this.close();
+                // Complete the task automatically
+                await api.completeTask(this.currentTaskId);
+
+                // Reload tasks to show updated status
                 await kanban.loadTasks();
+
+                // Close modal only after successful completion
+                this.close();
             } else {
                 // Reload comments in modal
                 await this.loadComments(this.currentTaskId);
             }
         } catch (error) {
             console.error('Failed to add comment:', error);
-            alert('Ошибка добавления комментария');
+            alert('Ошибка добавления комментария: ' + (error.message || 'Неизвестная ошибка'));
         }
     },
 
@@ -133,6 +151,24 @@ const comments = {
         } catch (error) {
             console.error('Failed to delete comment:', error);
             alert('Ошибка удаления комментария');
+        }
+    },
+
+    async skipComment() {
+        if (!this.isCompletionMode || !this.currentTaskId) return;
+
+        try {
+            // Complete the task without comment
+            await api.completeTask(this.currentTaskId);
+
+            // Reload tasks
+            await kanban.loadTasks();
+
+            // Close modal only after successful completion
+            this.close();
+        } catch (error) {
+            console.error('Failed to complete task:', error);
+            alert('Ошибка завершения задачи: ' + (error.message || 'Неизвестная ошибка'));
         }
     },
 

@@ -125,7 +125,10 @@
             <div id="commentsList"></div>
             <div class="comment-input">
                 <textarea id="newComment" placeholder="Добавить комментарий..."></textarea>
-                <button onclick="app.addComment()">Отправить</button>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="app.addComment()">Отправить</button>
+                    <button id="skipCommentBtn" onclick="comments.skipComment()" style="display: none; background: #95a5a6;" aria-label="Пропустить комментарий и завершить задачу">Пропустить</button>
+                </div>
             </div>
         </div>
     </div>

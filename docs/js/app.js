@@ -318,6 +318,19 @@ const app = {
         document.getElementById('archiveModal').style.display = 'none';
     },
 
+    async deleteArchivedTask(taskId) {
+        if (!confirm('Удалить задачу из архива? Это действие нельзя отменить.')) return;
+
+        try {
+            await api.deleteTask(taskId);
+            // Reload archive
+            await this.showArchive();
+        } catch (error) {
+            console.error('Failed to delete archived task:', error);
+            alert('Ошибка удаления задачи: ' + (error.message || 'Неизвестная ошибка'));
+        }
+    },
+
     renderArchive(tasks) {
         const container = document.getElementById('archiveList');
 
@@ -327,24 +340,57 @@ const app = {
         }
 
         container.innerHTML = tasks.map(task => {
-            const date = new Date(task.completed_at || task.archived_at).toLocaleDateString('ru-RU');
+            // Format date
+            let dateStr = 'Дата не указана';
+            if (task.completed_at) {
+                dateStr = new Date(task.completed_at).toLocaleDateString('ru-RU', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            } else if (task.archived_at) {
+                dateStr = new Date(task.archived_at).toLocaleDateString('ru-RU', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+
+            // Format time spent
             const timeSpent = this.formatTimeSpent(task.total_time_seconds || 0);
 
             // Get assignee username
-            const assignee = app.users.find(u => u.id === task.assigned_to);
-            const assigneeName = assignee ? assignee.username : 'Не назначена';
+            const assignee = (app.users || []).find(u => u.id === task.assigned_to);
+            const assigneeName = assignee?.username || 'Не назначена';
 
             return `
-                <div class="archive-card" onclick="app.showTaskDetail('${task.id}')">
-                    <h3>${this.escapeHtml(task.title)}</h3>
-                    <p class="archive-meta">
-                        <span>📅 ${date}</span>
-                        <span>⏱️ ${timeSpent}</span>
-                        <span>👤 ${this.escapeHtml(assigneeName)}</span>
-                    </p>
+                <div class="archive-card">
+                    <div class="archive-card-content" data-task-id="${this.escapeHtml(task.id)}" style="cursor: pointer; flex: 1;">
+                        <h3>${this.escapeHtml(task.title)}</h3>
+                        <p class="archive-meta">
+                            <span>📅 Завершено: ${dateStr}</span>
+                            <span>⏱️ Время: ${timeSpent}</span>
+                            <span>👤 Исполнитель: ${this.escapeHtml(assigneeName)}</span>
+                        </p>
+                    </div>
+                    <button class="btn-delete-archive" data-task-id="${this.escapeHtml(task.id)}" title="Удалить из архива">🗑️</button>
                 </div>
             `;
         }).join('');
+
+        // Add event listeners after rendering
+        container.querySelectorAll('.archive-card-content').forEach(el => {
+            el.addEventListener('click', () => {
+                this.showTaskDetail(el.dataset.taskId);
+            });
+        });
+
+        container.querySelectorAll('.btn-delete-archive').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteArchivedTask(btn.dataset.taskId);
+            });
+        });
     },
 
     formatTimeSpent(seconds) {

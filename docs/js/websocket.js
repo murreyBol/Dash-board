@@ -10,7 +10,8 @@ const websocket = {
         }
 
         try {
-            this.ws = new WebSocket('ws://localhost:8000/ws');
+            const wsUrl = api.baseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+            this.ws = new WebSocket(`${wsUrl}/ws`);
 
             this.ws.onopen = () => {
                 console.log('WebSocket connected');

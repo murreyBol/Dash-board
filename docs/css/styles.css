@@ -561,6 +561,11 @@ header h1 {
     .add-task-btn {
         font-size: 14px;
     }
+
+    /* Prevent archive grid overflow on very narrow screens */
+    #archiveList {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Calendar today highlight */
@@ -587,9 +592,11 @@ header h1 {
     background: #16213e;
     border-radius: 8px;
     padding: 20px;
-    cursor: pointer;
     transition: all 0.3s ease;
     border: 2px solid transparent;
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
 }
 
 .archive-card:hover {
@@ -602,6 +609,24 @@ header h1 {
     color: #14ffec;
     margin-bottom: 12px;
     font-size: 18px;
+}
+
+.btn-delete-archive {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    height: fit-content;
+}
+
+.btn-delete-archive:hover {
+    background: #c0392b;
+    transform: scale(1.1);
 }
 
 .archive-meta {
