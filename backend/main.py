@@ -114,8 +114,8 @@ async def check_access_token_middleware(request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    # Skip access token check for pin code endpoint
-    if request.url.path == "/auth/check-pin":
+    # Skip access token check for auth endpoints
+    if request.url.path in ["/auth/check-pin", "/auth/login", "/auth/register"]:
         return await call_next(request)
 
     # Get access token from header
