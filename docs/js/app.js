@@ -29,6 +29,22 @@ const app = {
         document.getElementById('dashboardScreen').style.display = 'none';
     },
 
+    showLogin() {
+        document.getElementById('pinScreen').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'block';
+        document.getElementById('dashboardScreen').style.display = 'none';
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('registerForm').style.display = 'none';
+    },
+
+    showRegister() {
+        document.getElementById('pinScreen').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'block';
+        document.getElementById('dashboardScreen').style.display = 'none';
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'block';
+    },
+
     async checkPin() {
         const pinCode = document.getElementById('pinCode').value.trim();
         const pinError = document.getElementById('pinError');
@@ -75,19 +91,8 @@ const app = {
         }
     },
 
-    showLogin() {
-        document.getElementById('loginScreen').style.display = 'block';
-        document.getElementById('dashboardScreen').style.display = 'none';
-        document.getElementById('loginForm').style.display = 'block';
-        document.getElementById('registerForm').style.display = 'none';
-    },
-
-    showRegister() {
-        document.getElementById('loginForm').style.display = 'none';
-        document.getElementById('registerForm').style.display = 'block';
-    },
-
     showDashboard() {
+        document.getElementById('pinScreen').style.display = 'none';
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('dashboardScreen').style.display = 'block';
         document.getElementById('currentUser').textContent = auth.currentUser.username;

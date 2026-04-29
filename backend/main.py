@@ -110,6 +110,10 @@ app.add_middleware(
 # Middleware to check access token
 @app.middleware("http")
 async def check_access_token_middleware(request, call_next):
+    # Skip access token check for OPTIONS (CORS preflight)
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     # Skip access token check for pin code endpoint
     if request.url.path == "/auth/check-pin":
         return await call_next(request)
