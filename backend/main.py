@@ -130,12 +130,18 @@ async def check_access_token_middleware(request, call_next):
             # Token expired, remove it
             del valid_access_tokens[access_token]
 
-    # No valid token - return 403
+    # No valid token - return 403 with CORS headers
     from fastapi.responses import JSONResponse
-    return JSONResponse(
+    response = JSONResponse(
         status_code=403,
         content={"detail": "Access denied. Please verify PIN code first."}
     )
+    # Add CORS headers manually
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # WebSocket connection manager
 class ConnectionManager:
