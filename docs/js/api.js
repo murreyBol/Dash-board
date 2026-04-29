@@ -21,6 +21,12 @@ const api = {
             ...options.headers
         };
 
+        // Add access token to all requests
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+            headers['X-Access-Token'] = accessToken;
+        }
+
         if (this.token && !endpoint.includes('/auth/')) {
             headers['Authorization'] = `Bearer ${this.token}`;
         }
@@ -33,6 +39,18 @@ const api = {
             });
 
             console.log('API Response status:', response.status);
+
+            // Handle access token errors
+            if (response.status === 403) {
+                const error = await response.json();
+                if (error.detail && error.detail.includes('Access denied')) {
+                    console.error('Access token invalid - redirecting to pin screen');
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('pin_verified');
+                    window.location.reload();
+                    return null;
+                }
+            }
 
             if (response.status === 401) {
                 console.error('401 Unauthorized - clearing token');

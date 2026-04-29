@@ -2,10 +2,11 @@ from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocke
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import List, Optional
 import json
 import os
+import secrets
 
 import models
 import schemas
@@ -15,6 +16,9 @@ from database import engine, get_db
 
 # Get PIN code from environment variable
 SITE_PIN_CODE = os.getenv("SITE_PIN_CODE", "1234")  # Default for development
+
+# Store valid access tokens (in production use Redis or database)
+valid_access_tokens = {}  # {token: expiry_time}
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -103,6 +107,32 @@ app.add_middleware(
     max_age=3600
 )
 
+# Middleware to check access token
+@app.middleware("http")
+async def check_access_token_middleware(request, call_next):
+    # Skip access token check for pin code endpoint
+    if request.url.path == "/auth/check-pin":
+        return await call_next(request)
+
+    # Get access token from header
+    access_token = request.headers.get("X-Access-Token")
+
+    # Check if token is valid
+    if access_token and access_token in valid_access_tokens:
+        # Check if not expired
+        if datetime.utcnow() <= valid_access_tokens[access_token]:
+            return await call_next(request)
+        else:
+            # Token expired, remove it
+            del valid_access_tokens[access_token]
+
+    # No valid token - return 403
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=403,
+        content={"detail": "Access denied. Please verify PIN code first."}
+    )
+
 # WebSocket connection manager
 class ConnectionManager:
     def __init__(self):
@@ -128,9 +158,37 @@ manager = ConnectionManager()
 @app.post("/auth/check-pin")
 def check_pin(pin_data: schemas.PinCodeCheck):
     if pin_data.pin_code == SITE_PIN_CODE:
-        return {"success": True, "message": "Pin code correct"}
+        # Generate access token
+        access_token = secrets.token_urlsafe(32)
+        # Token valid for 30 days
+        expiry = datetime.utcnow() + timedelta(days=30)
+        valid_access_tokens[access_token] = expiry
+
+        return {
+            "success": True,
+            "message": "Pin code correct",
+            "access_token": access_token
+        }
     else:
         raise HTTPException(status_code=401, detail="Invalid pin code")
+
+# Dependency to check access token
+def verify_access_token(access_token: str = None):
+    # Allow access if no token system is set up yet (backward compatibility)
+    if not access_token:
+        # Check if it's in header
+        from fastapi import Request
+        return None
+
+    if access_token not in valid_access_tokens:
+        raise HTTPException(status_code=403, detail="Invalid or expired access token")
+
+    # Check if token expired
+    if datetime.utcnow() > valid_access_tokens[access_token]:
+        del valid_access_tokens[access_token]
+        raise HTTPException(status_code=403, detail="Access token expired")
+
+    return access_token
 
 @app.get("/admin/pin-code")
 def get_pin_code(current_user: models.User = Depends(auth.get_current_user)):

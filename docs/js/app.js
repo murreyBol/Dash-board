@@ -40,7 +40,7 @@ const app = {
         }
 
         try {
-            const response = await fetch(`${api.baseUrl}/auth/check-pin`, {
+            const response = await fetch(`${API_URL}/auth/check-pin`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -49,6 +49,9 @@ const app = {
             });
 
             if (response.ok) {
+                const data = await response.json();
+                // Save access token
+                localStorage.setItem('access_token', data.access_token);
                 localStorage.setItem('pin_verified', 'true');
                 document.getElementById('pinScreen').style.display = 'none';
                 this.showLogin();
