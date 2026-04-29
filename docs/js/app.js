@@ -278,11 +278,13 @@ const app = {
     async showOverdue() {
         try {
             const overdueTasks = await api.getOverdueTasks();
-            this.renderOverdue(overdueTasks);
+            this.renderOverdue(overdueTasks || []);
             document.getElementById('overdueModal').style.display = 'block';
         } catch (error) {
             console.error('Failed to load overdue tasks:', error);
-            alert('Ошибка загрузки просроченных задач');
+            // Show empty state instead of error alert
+            this.renderOverdue([]);
+            document.getElementById('overdueModal').style.display = 'block';
         }
     },
 
