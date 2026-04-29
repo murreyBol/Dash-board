@@ -40,7 +40,7 @@ const app = {
         }
 
         try {
-            const response = await fetch(`${API_URL}/auth/check-pin`, {
+            const response = await fetch(`${api.baseUrl}/auth/check-pin`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

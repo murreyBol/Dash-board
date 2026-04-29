@@ -3,6 +3,7 @@ const API_URL = window.location.hostname === 'localhost'
     : 'https://dash-board-egwf.onrender.com';
 
 const api = {
+    baseUrl: API_URL,  // Make API_URL accessible
     token: localStorage.getItem('token'),
 
     setToken(token) {
