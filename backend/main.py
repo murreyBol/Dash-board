@@ -46,6 +46,27 @@ def run_migration():
                 conn.commit()
                 print("✓ Column added successfully")
 
+            # Check if session_id column exists in comments table
+            result = conn.execute(text("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_name='comments' AND column_name='session_id'
+            """))
+
+            if result.scalar() == 0:
+                print("Adding session_id column to comments table...")
+                conn.execute(text("""
+                    ALTER TABLE comments
+                    ADD COLUMN session_id VARCHAR
+                    REFERENCES time_sessions(id)
+                """))
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_comments_session_id
+                    ON comments(session_id)
+                """))
+                conn.commit()
+                print("✓ session_id column added successfully")
+
             # Make Viktor admin
             print("Setting Viktor as admin...")
             result = conn.execute(text("""
@@ -455,11 +476,36 @@ async def get_comments(
     db: Session = Depends(get_db)
 ):
     comments = crud.get_comments(db, task_id)
-    # Add username to each comment
+
+    # Build response with computed fields
+    result = []
     for comment in comments:
         user = db.query(models.User).filter(models.User.id == comment.user_id).first()
-        comment.username = user.username if user else "Unknown"
-    return comments
+
+        # Convert to dict and add computed fields
+        comment_dict = {
+            "id": comment.id,
+            "task_id": comment.task_id,
+            "user_id": comment.user_id,
+            "session_id": comment.session_id,
+            "text": comment.text,
+            "created_at": comment.created_at,
+            "updated_at": comment.updated_at,
+            "username": user.username if user else "Unknown",
+            "session_duration": None
+        }
+
+        # Add session duration if available
+        if comment.session_id:
+            session = db.query(models.TimeSession).filter(
+                models.TimeSession.id == comment.session_id
+            ).first()
+            if session and session.duration_seconds:
+                comment_dict["session_duration"] = session.duration_seconds
+
+        result.append(comment_dict)
+
+    return result
 
 @app.post("/tasks/{task_id}/comments", response_model=schemas.Comment)
 async def create_comment(

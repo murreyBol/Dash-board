@@ -75,6 +75,7 @@ class Comment(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     task_id = Column(String, ForeignKey("tasks.id"), nullable=False, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    session_id = Column(String, ForeignKey("time_sessions.id"), nullable=True)
     text = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True)
@@ -82,6 +83,7 @@ class Comment(Base):
     # Relationships
     task = relationship("Task", back_populates="comments")
     user = relationship("User", back_populates="comments")
+    session = relationship("TimeSession", backref="comments")
 
 class TimeSession(Base):
     __tablename__ = "time_sessions"

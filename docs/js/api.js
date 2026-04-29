@@ -189,10 +189,14 @@ const api = {
         return this.request(`/tasks/${taskId}/comments`);
     },
 
-    async createComment(taskId, text) {
+    async createComment(taskId, text, sessionId = null) {
+        const body = { text };
+        if (sessionId) {
+            body.session_id = sessionId;
+        }
         return this.request(`/tasks/${taskId}/comments`, {
             method: 'POST',
-            body: JSON.stringify({ text })
+            body: JSON.stringify(body)
         });
     },
 

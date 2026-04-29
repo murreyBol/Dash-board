@@ -1,16 +1,19 @@
 const comments = {
     currentTaskId: null,
+    currentSessionId: null,
     isCompletionMode: false,
 
     async show(taskId) {
         this.currentTaskId = taskId;
+        this.currentSessionId = null;
         this.isCompletionMode = false;
         await this.loadComments(taskId);
         document.getElementById('commentsModal').style.display = 'block';
     },
 
-    showForCompletion(taskId) {
+    showForCompletion(taskId, sessionId) {
         this.currentTaskId = taskId;
+        this.currentSessionId = sessionId || null;
         this.isCompletionMode = true;
 
         // Change modal title
@@ -90,8 +93,8 @@ const comments = {
         if (!text) return;
 
         try {
-            // Always add regular comment (no auto-completion)
-            await api.createComment(this.currentTaskId, text);
+            // Add comment with session_id if available
+            await api.createComment(this.currentTaskId, text, this.currentSessionId);
             document.getElementById('newComment').value = '';
 
             if (this.isCompletionMode) {

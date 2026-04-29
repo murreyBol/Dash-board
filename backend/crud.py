@@ -171,7 +171,8 @@ def create_comment(db: Session, task_id: str, user_id: str, comment: schemas.Com
     db_comment = models.Comment(
         task_id=task_id,
         user_id=user_id,
-        text=comment.text
+        text=comment.text,
+        session_id=comment.session_id
     )
     db.add(db_comment)
     db.commit()

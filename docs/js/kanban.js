@@ -301,13 +301,21 @@ const kanban = {
             const commentsHtml = comments.map(comment => {
                 const date = new Date(comment.created_at).toLocaleString('ru-RU');
                 const username = comment.username || 'Пользователь';
+
+                // Format session duration if available
+                let timeInfo = '';
+                if (comment.session_duration) {
+                    const duration = timer.formatDuration(comment.session_duration);
+                    timeInfo = ` <span style="color: #3498db;">(Время: ${duration})</span>`;
+                }
+
                 return `
                     <div class="inline-comment">
                         <div class="comment-header">
                             <strong>${this.escapeHtml(username)}</strong>
                             <span class="comment-date">${date}</span>
                         </div>
-                        <div class="comment-text">${this.escapeHtml(comment.text)}</div>
+                        <div class="comment-text">${this.escapeHtml(comment.text)}${timeInfo}</div>
                     </div>
                 `;
             }).join('');

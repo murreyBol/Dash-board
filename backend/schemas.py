@@ -74,7 +74,7 @@ class CommentBase(BaseModel):
     text: str
 
 class CommentCreate(CommentBase):
-    pass
+    session_id: Optional[str] = None
 
 class CommentUpdate(CommentBase):
     pass
@@ -83,11 +83,13 @@ class Comment(CommentBase):
     id: str
     task_id: str
     user_id: str
+    session_id: Optional[str] = None
     username: Optional[str] = None
+    session_duration: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "extra": "allow"}
 
 # TimeSession schemas
 class TimeSessionBase(BaseModel):
