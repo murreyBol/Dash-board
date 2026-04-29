@@ -13,9 +13,53 @@ import schemas
 import crud
 import auth
 from database import engine, get_db
+import logging
+import threading
+import stat
 
-# Get PIN code from environment variable
-SITE_PIN_CODE = os.getenv("SITE_PIN_CODE", "1234")  # Default for development
+# Setup logging
+logger = logging.getLogger(__name__)
+
+# PIN code file path
+PIN_CODE_FILE = os.path.join(os.path.dirname(__file__), ".pin_code")
+
+# Lock for thread-safe PIN code updates
+_pin_code_lock = threading.Lock()
+
+def load_pin_code():
+    """Load PIN code from file, or use environment variable/default."""
+    if os.path.exists(PIN_CODE_FILE):
+        try:
+            with open(PIN_CODE_FILE, 'r') as f:
+                pin = f.read().strip()
+                if pin and len(pin) >= 4:
+                    logger.info("PIN code loaded from file")
+                    return pin
+                elif pin:
+                    logger.warning(f"PIN code in file is too short ({len(pin)} chars), using fallback")
+        except Exception as e:
+            logger.error(f"Error reading PIN code file: {e}", exc_info=True)
+
+    # Fallback to environment variable or default
+    logger.warning("Using fallback PIN code from environment or default")
+    return os.getenv("SITE_PIN_CODE", "1234")
+
+def save_pin_code(pin_code: str):
+    """Save PIN code to file with restricted permissions."""
+    try:
+        with open(PIN_CODE_FILE, 'w') as f:
+            f.write(pin_code)
+
+        # Set file permissions to 0600 (owner read/write only)
+        os.chmod(PIN_CODE_FILE, stat.S_IRUSR | stat.S_IWUSR)
+        logger.info("PIN code saved successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving PIN code: {e}", exc_info=True)
+        return False
+
+# Get PIN code from file or environment variable
+SITE_PIN_CODE = load_pin_code()
 
 # Store valid access tokens (in production use Redis or database)
 valid_access_tokens = {}  # {token: expiry_time}
@@ -218,8 +262,14 @@ def update_pin_code(
     if not pin_data.pin_code or len(pin_data.pin_code) < 4:
         raise HTTPException(status_code=400, detail="Pin code must be at least 4 characters")
 
-    SITE_PIN_CODE = pin_data.pin_code
-    return {"success": True, "message": "Pin code updated", "pin_code": SITE_PIN_CODE}
+    with _pin_code_lock:
+        # Save to file
+        if not save_pin_code(pin_data.pin_code):
+            raise HTTPException(status_code=500, detail="Failed to save pin code")
+
+        SITE_PIN_CODE = pin_data.pin_code
+
+    return {"success": True, "message": "Pin code updated and saved", "pin_code": SITE_PIN_CODE}
 
 # Auth endpoints
 @app.post("/auth/register", response_model=schemas.User)
@@ -525,6 +575,29 @@ async def get_overdue_tasks(
 ):
     return crud.get_overdue_tasks(db)
 
+@app.post("/tasks/{task_id}/restore", response_model=schemas.Task)
+async def restore_task(
+    task_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_task = crud.restore_task(db, task_id)
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    try:
+        await manager.broadcast({
+            "type": "task_restored",
+            "data": {
+                "task": schemas.Task.model_validate(db_task).model_dump(),
+                "user": {"id": current_user.id, "username": current_user.username}
+            }
+        })
+    except Exception as broadcast_error:
+        print(f"WebSocket broadcast failed: {broadcast_error}")
+
+    return db_task
+
 # Timer endpoints
 @app.post("/tasks/{task_id}/start-timer", response_model=schemas.TimeSession)
 async def start_timer(
@@ -677,7 +750,7 @@ async def delete_comment(
     return {"message": "Comment deleted"}
 
 # Calendar endpoints
-@app.get("/calendar/sessions", response_model=List[schemas.TimeSession])
+@app.get("/calendar/sessions", response_model=List[schemas.CalendarSession])
 async def get_calendar_sessions(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,

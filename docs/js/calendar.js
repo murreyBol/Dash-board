@@ -112,6 +112,9 @@ const calendar = {
             const taskId = session.task_id;
             if (!byTask[taskId]) {
                 byTask[taskId] = {
+                    title: session.task_title,
+                    description: session.task_description,
+                    creator: session.creator_username,
                     sessions: [],
                     total: 0
                 };
@@ -122,10 +125,13 @@ const calendar = {
 
         html += '<div style="margin-top: 15px;">';
         for (const [taskId, data] of Object.entries(byTask)) {
+            const description = data.description ? app.escapeHtml(data.description) : 'Нет описания';
             html += `
-                <div style="background: #16213e; padding: 10px; border-radius: 6px; margin-bottom: 8px;">
-                    <div style="color: #0d7377; font-weight: 600;">Задача ${taskId.substring(0, 8)}</div>
-                    <div style="color: #aaa; font-size: 14px;">${timer.formatDuration(data.total)}</div>
+                <div style="background: #16213e; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
+                    <div style="color: #0d7377; font-weight: 600; margin-bottom: 6px;">${app.escapeHtml(data.title)}</div>
+                    <div style="color: #aaa; font-size: 13px; margin-bottom: 4px;">${description}</div>
+                    <div style="color: #888; font-size: 12px; margin-bottom: 6px;">Создатель: ${app.escapeHtml(data.creator)}</div>
+                    <div style="color: #0d7377; font-size: 14px; font-weight: 500;">${timer.formatDuration(data.total)}</div>
                 </div>
             `;
         }

@@ -249,14 +249,53 @@ def stop_timer(db: Session, task_id: str, user_id: str):
     return active_session
 
 def get_calendar_sessions(db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None):
-    query = db.query(models.TimeSession).filter(models.TimeSession.ended_at != None)
+    from sqlalchemy.orm import aliased
+
+    # Create aliases for User table to distinguish session user from task creator
+    SessionUser = aliased(models.User)
+    CreatorUser = aliased(models.User)
+
+    query = db.query(
+        models.TimeSession,
+        models.Task.title.label('task_title'),
+        models.Task.description.label('task_description'),
+        models.Task.created_by.label('created_by'),
+        SessionUser.username.label('session_username'),
+        CreatorUser.username.label('creator_username')
+    ).join(
+        models.Task, models.TimeSession.task_id == models.Task.id
+    ).join(
+        SessionUser, models.TimeSession.user_id == SessionUser.id
+    ).join(
+        CreatorUser, models.Task.created_by == CreatorUser.id
+    ).filter(models.TimeSession.ended_at != None)
 
     if start_date:
         query = query.filter(models.TimeSession.started_at >= start_date)
     if end_date:
         query = query.filter(models.TimeSession.started_at <= end_date)
 
-    return query.all()
+    results = query.all()
+
+    # Transform results to include task and creator info
+    sessions = []
+    for row in results:
+        session_dict = {
+            'id': row.TimeSession.id,
+            'task_id': row.TimeSession.task_id,
+            'task_title': row.task_title,
+            'task_description': row.task_description,
+            'created_by': row.created_by,
+            'creator_username': row.creator_username,
+            'user_id': row.TimeSession.user_id,
+            'username': row.session_username,
+            'started_at': row.TimeSession.started_at,
+            'ended_at': row.TimeSession.ended_at,
+            'duration_seconds': row.TimeSession.duration_seconds
+        }
+        sessions.append(session_dict)
+
+    return sessions
 
 def get_task_last_activity(db: Session, task_id: str) -> Optional[datetime]:
     """Calculate the most recent activity timestamp for a task."""
@@ -307,3 +346,13 @@ def get_overdue_tasks(db: Session, days_threshold: int = 7):
                 overdue_tasks.append(task)
 
     return overdue_tasks
+
+def restore_task(db: Session, task_id: str):
+    """Restore an overdue task by updating its updated_at timestamp."""
+    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if db_task:
+        # Update the timestamp to reset the 7-day countdown
+        db_task.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(db_task)
+    return db_task

@@ -742,3 +742,24 @@ header h1 {
 .pin-management button:hover {
     background: #0a5a5d !important;
 }
+
+/* Restore button for overdue tasks */
+.btn-restore {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.btn-restore:hover {
+    background: #229954;
+    transform: scale(1.05);
+}
+
+.btn-restore:active {
+    transform: scale(0.98);
+}

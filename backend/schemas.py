@@ -123,7 +123,16 @@ class TokenData(BaseModel):
 
 # Calendar schemas
 class CalendarSession(BaseModel):
-    date: str
+    id: str
+    task_id: str
     task_title: str
+    task_description: Optional[str] = None
+    created_by: str
+    creator_username: str
+    user_id: str
     username: str
+    started_at: datetime
+    ended_at: Optional[datetime] = None
     duration_seconds: int
+
+    model_config = {"from_attributes": True, "extra": "allow"}

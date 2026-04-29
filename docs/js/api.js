@@ -260,5 +260,11 @@ const api = {
     // Overdue
     async getOverdueTasks() {
         return this.request('/tasks/overdue');
+    },
+
+    async restoreTask(taskId) {
+        return this.request(`/tasks/${taskId}/restore`, {
+            method: 'POST'
+        });
     }
 };

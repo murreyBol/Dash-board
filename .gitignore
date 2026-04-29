@@ -19,6 +19,9 @@ build/
 .env
 .env.local
 
+# PIN code (security)
+.pin_code
+
 # IDE
 .vscode/
 .idea/

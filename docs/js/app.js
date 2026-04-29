@@ -297,9 +297,24 @@ const app = {
                     <p style="margin-top: 8px;"><strong>Статус:</strong> ${assignee}</p>
                     <p style="margin-top: 4px;"><strong>Последняя активность:</strong> ${lastActivity}</p>
                     <p style="margin-top: 4px; color: #e74c3c;"><strong>Неактивна:</strong> ${inactiveDays} дней</p>
+                    <button class="btn-restore" onclick="app.restoreTask('${task.id}')" style="margin-top: 12px;">
+                        Восстановить
+                    </button>
                 </div>
             `;
         }).join('');
+    },
+
+    async restoreTask(taskId) {
+        try {
+            await api.restoreTask(taskId);
+            notifications.show('Успех', 'Задача восстановлена! 7-дневный отсчёт начался заново.');
+            await this.showOverdue();
+            // WebSocket will handle kanban update automatically
+        } catch (error) {
+            console.error('Failed to restore task:', error);
+            notifications.show('Ошибка', 'Ошибка восстановления задачи: ' + (error.message || 'Неизвестная ошибка'));
+        }
     },
 
     // Archive Modal

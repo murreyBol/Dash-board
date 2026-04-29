@@ -98,6 +98,11 @@ const websocket = {
                 kanban.removeTask(data.task.id);
                 break;
 
+            case 'task_restored':
+                kanban.updateTask(data.task);
+                notifications.show('Задача восстановлена', `${data.user.username} восстановил задачу: ${data.task.title}`);
+                break;
+
             case 'timer_started':
                 kanban.updateTask(data.task);
                 break;
