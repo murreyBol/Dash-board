@@ -86,8 +86,10 @@ const app = {
     async loadUsers() {
         try {
             this.users = await api.getUsers();
+            console.log('Users loaded:', this.users);
         } catch (error) {
             console.error('Failed to load users:', error);
+            this.users = []; // Initialize empty array on error
         }
     },
 
@@ -150,7 +152,12 @@ const app = {
     },
 
     // Task Modal
-    showCreateTaskModal() {
+    async showCreateTaskModal() {
+        // Ensure users are loaded
+        if (!this.users || this.users.length === 0) {
+            await this.loadUsers();
+        }
+
         document.getElementById('taskModalTitle').textContent = 'Создать задачу';
         document.getElementById('taskTitle').value = '';
         document.getElementById('taskDescription').value = '';
@@ -164,6 +171,11 @@ const app = {
     populateAssigneeSelect() {
         const select = document.getElementById('taskAssignee');
         select.innerHTML = '<option value="">Не назначена</option>';
+
+        if (!this.users || this.users.length === 0) {
+            console.warn('No users available for assignment');
+            return;
+        }
 
         this.users.forEach(user => {
             const option = document.createElement('option');

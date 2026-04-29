@@ -254,9 +254,14 @@ const kanban = {
         }
     },
 
-    editTask(taskId) {
+    async editTask(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) return;
+
+        // Ensure users are loaded
+        if (!app.users || app.users.length === 0) {
+            await app.loadUsers();
+        }
 
         this.currentEditingTask = taskId;
         document.getElementById('taskModalTitle').textContent = 'Редактировать задачу';
