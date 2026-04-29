@@ -48,11 +48,12 @@ const timer = {
             return;
         }
 
-        clearInterval(session.interval);
-        this.activeSessions.delete(taskId);
-
         try {
             const result = await api.stopTimer(taskId);
+
+            // Only clear local state after successful API response
+            clearInterval(session.interval);
+            this.activeSessions.delete(taskId);
             this.updateDisplay(taskId, 0);
 
             // Show comment modal after stopping timer with session_id
@@ -86,5 +87,9 @@ const timer = {
             clearInterval(session.interval);
         }
         this.activeSessions.clear();
+    },
+
+    cleanup() {
+        this.stopAll();
     }
 };

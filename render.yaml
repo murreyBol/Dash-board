@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: task-planner-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "bash backend/start.sh"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: task-planner-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+        sync: false
+      - key: SITE_PIN_CODE
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://yourusername.github.io
+      - key: PORT
+        value: 8000
+
+databases:
+  - name: task-planner-db
+    databaseName: task_planner
+    user: task_planner_user
+    plan: free

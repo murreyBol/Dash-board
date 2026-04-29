@@ -1,6 +1,7 @@
-const API_URL = window.location.hostname === 'localhost'
+// Auto-detect environment and use appropriate API URL
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8000'
-    : 'https://dash-board-egwf.onrender.com';
+    : 'https://YOUR-RENDER-APP-NAME.onrender.com';  // Replace with your actual Render URL
 
 const api = {
     baseUrl: API_URL,  // Make API_URL accessible
@@ -14,6 +15,26 @@ const api = {
     clearToken() {
         this.token = null;
         localStorage.removeItem('token');
+    },
+
+    getUserFriendlyError(error) {
+        const errorMap = {
+            'Network request failed': 'Ошибка сети. Проверьте подключение к интернету.',
+            'Failed to fetch': 'Не удалось подключиться к серверу.',
+            'Request failed': 'Запрос не выполнен. Попробуйте снова.',
+            'Unauthorized': 'Требуется авторизация.',
+            'Access denied': 'Доступ запрещен.',
+            'Not found': 'Ресурс не найден.',
+            'Internal server error': 'Ошибка сервера. Попробуйте позже.'
+        };
+
+        const message = error.message || String(error);
+        for (const [key, value] of Object.entries(errorMap)) {
+            if (message.includes(key)) {
+                return value;
+            }
+        }
+        return message;
     },
 
     async request(endpoint, options = {}) {
@@ -46,6 +67,10 @@ const api = {
                 const error = await response.json();
                 if (error.detail && error.detail.includes('Access denied')) {
                     console.error('Access token invalid - redirecting to pin screen');
+                    const friendlyError = this.getUserFriendlyError(error);
+                    if (typeof notifications !== 'undefined') {
+                        notifications.show('Ошибка доступа', friendlyError);
+                    }
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('pin_verified');
                     window.location.reload();
@@ -55,6 +80,9 @@ const api = {
 
             if (response.status === 401) {
                 console.error('401 Unauthorized - clearing token');
+                if (typeof notifications !== 'undefined') {
+                    notifications.show('Ошибка авторизации', 'Требуется повторный вход в систему');
+                }
                 this.clearToken();
                 window.location.reload();
                 return null;
@@ -63,6 +91,10 @@ const api = {
             if (!response.ok) {
                 const error = await response.json();
                 console.error('API Error response:', error);
+                const friendlyError = this.getUserFriendlyError(error);
+                if (typeof notifications !== 'undefined') {
+                    notifications.show('Ошибка', friendlyError);
+                }
                 throw new Error(error.detail || 'Request failed');
             }
 
@@ -71,6 +103,10 @@ const api = {
             return data;
         } catch (error) {
             console.error('API Error:', error);
+            const friendlyError = this.getUserFriendlyError(error);
+            if (typeof notifications !== 'undefined') {
+                notifications.show('Ошибка', friendlyError);
+            }
             throw error;
         }
     },

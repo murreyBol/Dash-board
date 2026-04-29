@@ -5,12 +5,21 @@ import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+import os
+import secrets
 
 import models
 import schemas
 from database import get_db
 
-SECRET_KEY = "your-secret-key-change-this-in-production"
+# Load SECRET_KEY from environment variable
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError(
+        "JWT_SECRET_KEY environment variable is not set. "
+        "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

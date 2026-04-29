@@ -10,7 +10,14 @@ if DATABASE_URL:
     # Render.com использует postgres://, но SQLAlchemy требует postgresql://
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-    engine = create_engine(DATABASE_URL)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=10,
+        max_overflow=20,
+        pool_timeout=30,
+        pool_recycle=3600,
+        pool_pre_ping=True
+    )
 else:
     # Локальная разработка - SQLite
     SQLALCHEMY_DATABASE_URL = "sqlite:///./task_planner.db"

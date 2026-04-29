@@ -92,13 +92,29 @@ const comments = {
                     <div class="comment-text">${this.escapeHtml(comment.text)}</div>
                     ${isOwner ? `
                         <div class="comment-actions">
-                            <button onclick="comments.editComment('${comment.id}', '${this.escapeHtml(comment.text)}')">Редактировать</button>
-                            <button onclick="comments.deleteComment('${comment.id}')">Удалить</button>
+                            <button data-action="edit" data-comment-id="${comment.id}" data-comment-text="${this.escapeHtml(comment.text)}">Редактировать</button>
+                            <button data-action="delete" data-comment-id="${comment.id}">Удалить</button>
                         </div>
                     ` : ''}
                 </div>
             `;
         }).join('');
+
+        // Add event delegation for comment actions
+        container.querySelectorAll('[data-action="edit"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const commentId = e.target.dataset.commentId;
+                const commentText = e.target.dataset.commentText;
+                this.editComment(commentId, commentText);
+            });
+        });
+
+        container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const commentId = e.target.dataset.commentId;
+                this.deleteComment(commentId);
+            });
+        });
     },
 
     async addComment() {

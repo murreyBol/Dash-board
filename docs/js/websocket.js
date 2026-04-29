@@ -1,8 +1,10 @@
 const websocket = {
     ws: null,
     reconnectAttempts: 0,
-    maxReconnectAttempts: 5,
+    maxReconnectAttempts: Infinity, // Unlimited reconnection attempts
     reconnectDelay: 1000,
+    reconnectButtonShown: false,
+    reconnectTimeout: null,
 
     connect() {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -11,16 +13,39 @@ const websocket = {
 
         try {
             const wsUrl = api.baseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+            const token = localStorage.getItem('token');
+            if (!token) {
+                console.error('No authentication token available for WebSocket');
+                return;
+            }
+            // Connect without token in URL for security
             this.ws = new WebSocket(`${wsUrl}/ws`);
 
             this.ws.onopen = () => {
-                console.log('WebSocket connected');
-                this.reconnectAttempts = 0;
+                console.log('WebSocket connected, sending authentication...');
+                // Send token in first message after connection
+                this.ws.send(JSON.stringify({
+                    type: 'auth',
+                    token: token
+                }));
             };
 
             this.ws.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
+
+                    // Handle authentication success
+                    if (message.type === 'auth_success') {
+                        console.log('WebSocket authenticated successfully');
+                        this.reconnectAttempts = 0;
+                        this.reconnectButtonShown = false;
+                        this.hideReconnectButton();
+                        if (typeof notifications !== 'undefined') {
+                            notifications.show('Подключено', 'WebSocket соединение восстановлено');
+                        }
+                        return;
+                    }
+
                     this.handleMessage(message);
                 } catch (error) {
                     console.error('WebSocket message error:', error);
@@ -42,15 +67,60 @@ const websocket = {
     },
 
     reconnect() {
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-            console.log(`Reconnecting in ${delay}ms...`);
-            setTimeout(() => this.connect(), delay);
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+
+        this.reconnectAttempts++;
+        const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000); // Max 30s delay
+        console.log(`Reconnecting in ${delay}ms... (attempt ${this.reconnectAttempts})`);
+
+        // Show reconnect button after 3 failed attempts
+        if (this.reconnectAttempts >= 3 && !this.reconnectButtonShown) {
+            this.showReconnectButton();
+        }
+
+        this.reconnectTimeout = setTimeout(() => {
+            this.reconnectTimeout = null;
+            this.connect();
+        }, delay);
+    },
+
+    showReconnectButton() {
+        this.reconnectButtonShown = true;
+        if (typeof notifications !== 'undefined') {
+            notifications.show('Соединение потеряно', 'Попытка переподключения... Вы можете обновить страницу вручную.');
+        }
+
+        // Add reconnect button to header if not exists
+        const header = document.querySelector('.header');
+        if (header && !document.getElementById('manualReconnectBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'manualReconnectBtn';
+            btn.textContent = '🔄 Переподключить';
+            btn.className = 'btn-reconnect';
+            btn.style.cssText = 'margin-left: 10px; padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;';
+            btn.onclick = () => {
+                this.reconnectAttempts = 0;
+                this.connect();
+            };
+            header.appendChild(btn);
+        }
+    },
+
+    hideReconnectButton() {
+        const btn = document.getElementById('manualReconnectBtn');
+        if (btn) {
+            btn.remove();
         }
     },
 
     disconnect() {
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
         if (this.ws) {
             this.ws.close();
             this.ws = null;

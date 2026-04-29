@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from typing import List, Optional
+from jose import JWTError, jwt
 import json
 import os
 import secrets
@@ -16,53 +17,112 @@ from database import engine, get_db
 import logging
 import threading
 import stat
+import bcrypt
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 # PIN code file path
-PIN_CODE_FILE = os.path.join(os.path.dirname(__file__), ".pin_code")
+PIN_CODE_FILE = os.path.join(os.path.dirname(__file__), ".pin_code_hash")
 
 # Lock for thread-safe PIN code updates
 _pin_code_lock = threading.Lock()
 
-def load_pin_code():
-    """Load PIN code from file, or use environment variable/default."""
+def hash_pin_code(pin_code: str) -> str:
+    """Hash a PIN code using bcrypt."""
+    return bcrypt.hashpw(pin_code.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_pin_code(pin_code: str, hashed: str) -> bool:
+    """Verify a PIN code against its hash."""
+    try:
+        return bcrypt.checkpw(pin_code.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception as e:
+        logger.error(f"Error verifying PIN code: {e}", exc_info=True)
+        return False
+
+def load_pin_code_hash():
+    """Load PIN code hash from file or environment variable. No default fallback."""
     if os.path.exists(PIN_CODE_FILE):
         try:
             with open(PIN_CODE_FILE, 'r') as f:
-                pin = f.read().strip()
-                if pin and len(pin) >= 4:
-                    logger.info("PIN code loaded from file")
-                    return pin
-                elif pin:
-                    logger.warning(f"PIN code in file is too short ({len(pin)} chars), using fallback")
+                pin_hash = f.read().strip()
+                if pin_hash:
+                    logger.info("PIN code hash loaded from file")
+                    return pin_hash
         except Exception as e:
-            logger.error(f"Error reading PIN code file: {e}", exc_info=True)
+            logger.error(f"Error reading PIN code hash file: {e}", exc_info=True)
 
-    # Fallback to environment variable or default
-    logger.warning("Using fallback PIN code from environment or default")
-    return os.getenv("SITE_PIN_CODE", "1234")
+    # Try environment variable (must be a bcrypt hash)
+    env_pin = os.getenv("SITE_PIN_CODE")
+    if env_pin:
+        # Check if it's already a hash or plain text
+        if env_pin.startswith('$2b$') or env_pin.startswith('$2a$') or env_pin.startswith('$2y$'):
+            logger.info("Using PIN code hash from environment variable")
+            return env_pin
+        else:
+            # Hash the plain text PIN from environment
+            logger.warning("Environment variable contains plain text PIN, hashing it")
+            return hash_pin_code(env_pin)
 
-def save_pin_code(pin_code: str):
-    """Save PIN code to file with restricted permissions."""
+    # No PIN code configured - this is a critical error
+    logger.error("CRITICAL: No PIN code configured. Set SITE_PIN_CODE environment variable.")
+    raise ValueError("No PIN code configured. Set SITE_PIN_CODE environment variable.")
+
+def save_pin_code_hash(pin_code: str):
+    """Hash and save PIN code to file with restricted permissions."""
     try:
+        pin_hash = hash_pin_code(pin_code)
+
         with open(PIN_CODE_FILE, 'w') as f:
-            f.write(pin_code)
+            f.write(pin_hash)
 
         # Set file permissions to 0600 (owner read/write only)
         os.chmod(PIN_CODE_FILE, stat.S_IRUSR | stat.S_IWUSR)
-        logger.info("PIN code saved successfully")
-        return True
+        logger.info("PIN code hash saved successfully")
+        return pin_hash
     except Exception as e:
-        logger.error(f"Error saving PIN code: {e}", exc_info=True)
-        return False
+        logger.error(f"Error saving PIN code hash: {e}", exc_info=True)
+        return None
 
-# Get PIN code from file or environment variable
-SITE_PIN_CODE = load_pin_code()
+# Get PIN code hash from file or environment variable
+try:
+    SITE_PIN_CODE_HASH = load_pin_code_hash()
+except ValueError as e:
+    logger.error(f"Failed to load PIN code: {e}")
+    logger.error("Application will not start without a configured PIN code.")
+    logger.error("Please set SITE_PIN_CODE environment variable or run migrate_pin.py")
+    raise
 
 # Store valid access tokens (in production use Redis or database)
 valid_access_tokens = {}  # {token: expiry_time}
+
+# Rate limiting for PIN attempts
+pin_attempt_tracker = {}  # {ip: [timestamp1, timestamp2, ...]}
+PIN_ATTEMPT_LIMIT = 5  # Max attempts
+PIN_ATTEMPT_WINDOW = 300  # 5 minutes in seconds
+
+def check_rate_limit(ip: str) -> bool:
+    """Check if IP has exceeded rate limit for PIN attempts."""
+    now = datetime.utcnow()
+
+    # Clean up old attempts
+    if ip in pin_attempt_tracker:
+        pin_attempt_tracker[ip] = [
+            timestamp for timestamp in pin_attempt_tracker[ip]
+            if (now - timestamp).total_seconds() < PIN_ATTEMPT_WINDOW
+        ]
+
+    # Check if limit exceeded
+    if ip in pin_attempt_tracker and len(pin_attempt_tracker[ip]) >= PIN_ATTEMPT_LIMIT:
+        return False
+
+    return True
+
+def record_pin_attempt(ip: str):
+    """Record a PIN attempt for rate limiting."""
+    if ip not in pin_attempt_tracker:
+        pin_attempt_tracker[ip] = []
+    pin_attempt_tracker[ip].append(datetime.utcnow())
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -140,10 +200,19 @@ run_migration()
 
 app = FastAPI(title="Task Planner API")
 
-# CORS - allow all origins
+# CORS - load allowed origins from environment variable
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+
+if not allowed_origins:
+    logger.warning("No ALLOWED_ORIGINS configured, using default localhost origins")
+    allowed_origins = ["http://localhost:3000", "http://localhost:8080"]
+
+logger.info(f"CORS allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -176,12 +245,17 @@ async def check_access_token_middleware(request, call_next):
 
     # No valid token - return 403 with CORS headers
     from fastapi.responses import JSONResponse
+
+    # Determine the origin to allow based on request
+    request_origin = request.headers.get("origin", "")
+    allowed_origin = request_origin if request_origin in allowed_origins else (allowed_origins[0] if allowed_origins else "*")
+
     response = JSONResponse(
         status_code=403,
         content={"detail": "Access denied. Please verify PIN code first."}
     )
     # Add CORS headers manually
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = allowed_origin
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "*"
@@ -208,10 +282,78 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Pin code endpoint
+# Helper function to check task authorization
+def check_task_authorization(
+    db: Session,
+    task_id: str,
+    current_user: models.User,
+    action: str
+) -> models.Task:
+    """
+    Check if user is authorized to perform action on task.
+    Returns the task if authorized, raises HTTPException otherwise.
+
+    Authorization rules:
+    - update: Only creator or assignee
+    - delete: Only creator
+    - assign: Only creator or admin
+    - complete: Only assignee
+    - archive: Only creator
+    """
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if action == "update":
+        if task.created_by != current_user.id and task.assigned_to != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only task creator or assignee can update this task"
+            )
+    elif action == "delete":
+        if task.created_by != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only task creator can delete this task"
+            )
+    elif action == "assign":
+        if task.created_by != current_user.id and not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only task creator or admin can assign this task"
+            )
+    elif action == "complete":
+        if task.assigned_to != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the assignee can complete this task"
+            )
+    elif action == "archive":
+        if task.created_by != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only task creator can archive this task"
+            )
+
+    return task
+
+# Pin code endpoint with rate limiting
 @app.post("/auth/check-pin")
-def check_pin(pin_data: schemas.PinCodeCheck):
-    if pin_data.pin_code == SITE_PIN_CODE:
+def check_pin(pin_data: schemas.PinCodeCheck, request: Request):
+    # Get client IP
+    client_ip = request.client.host
+
+    # Check rate limit
+    if not check_rate_limit(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many PIN attempts. Please try again in 5 minutes."
+        )
+
+    # Record attempt
+    record_pin_attempt(client_ip)
+
+    if verify_pin_code(pin_data.pin_code, SITE_PIN_CODE_HASH):
         # Generate access token
         access_token = secrets.token_urlsafe(32)
         # Token valid for 30 days
@@ -248,14 +390,15 @@ def verify_access_token(access_token: str = None):
 def get_pin_code(current_user: models.User = Depends(auth.get_current_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
-    return {"pin_code": SITE_PIN_CODE}
+    # Never return the actual PIN or hash
+    return {"message": "PIN code is configured", "has_pin": bool(SITE_PIN_CODE_HASH)}
 
 @app.post("/admin/pin-code")
 def update_pin_code(
     pin_data: schemas.PinCodeCheck,
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    global SITE_PIN_CODE
+    global SITE_PIN_CODE_HASH
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
 
@@ -263,13 +406,14 @@ def update_pin_code(
         raise HTTPException(status_code=400, detail="Pin code must be at least 4 characters")
 
     with _pin_code_lock:
-        # Save to file
-        if not save_pin_code(pin_data.pin_code):
+        # Hash and save to file
+        new_hash = save_pin_code_hash(pin_data.pin_code)
+        if not new_hash:
             raise HTTPException(status_code=500, detail="Failed to save pin code")
 
-        SITE_PIN_CODE = pin_data.pin_code
+        SITE_PIN_CODE_HASH = new_hash
 
-    return {"success": True, "message": "Pin code updated and saved", "pin_code": SITE_PIN_CODE}
+    return {"success": True, "message": "Pin code updated and saved"}
 
 # Auth endpoints
 @app.post("/auth/register", response_model=schemas.User)
@@ -420,6 +564,9 @@ async def update_task(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Check authorization
+    check_task_authorization(db, task_id, current_user, "update")
+
     db_task = crud.update_task(db, task_id, task_update)
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -438,6 +585,9 @@ async def delete_task(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Check authorization
+    check_task_authorization(db, task_id, current_user, "delete")
+
     success = crud.delete_task(db, task_id)
     if not success:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -454,6 +604,9 @@ async def assign_task(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Check authorization
+    check_task_authorization(db, task_id, current_user, "assign")
+
     db_task = crud.assign_task(db, task_id, user_id)
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -478,17 +631,20 @@ async def complete_task(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Check authorization
+    check_task_authorization(db, task_id, current_user, "complete")
+
     db_task = crud.complete_task(db, task_id)
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     # Validate separately from broadcast
     try:
         task_data = schemas.Task.model_validate(db_task).model_dump()
     except Exception as validation_error:
         print(f"Task validation error: {validation_error}")
         raise HTTPException(status_code=500, detail="Task validation failed")
-    
+
     # Broadcast separately
     try:
         await manager.broadcast({
@@ -500,7 +656,7 @@ async def complete_task(
         })
     except Exception as broadcast_error:
         print(f"WebSocket broadcast failed: {broadcast_error}")
-    
+
     return db_task
 
 @app.post("/tasks/{task_id}/postpone", response_model=schemas.Task)
@@ -532,21 +688,24 @@ async def archive_task(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Check authorization
+    check_task_authorization(db, task_id, current_user, "archive")
+
     try:
         db_task = crud.archive_task(db, task_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     # Validate separately from broadcast
     try:
         task_data = schemas.Task.model_validate(db_task).model_dump()
     except Exception as validation_error:
         print(f"Task validation error: {validation_error}")
         raise HTTPException(status_code=500, detail="Task validation failed")
-    
+
     # Broadcast separately
     try:
         await manager.broadcast({
@@ -558,7 +717,7 @@ async def archive_task(
         })
     except Exception as broadcast_error:
         print(f"WebSocket broadcast failed: {broadcast_error}")
-    
+
     return db_task
 
 @app.get("/tasks/archived/list", response_model=List[schemas.Task])
@@ -651,11 +810,9 @@ async def get_comments(
 ):
     comments = crud.get_comments(db, task_id)
 
-    # Build response with computed fields
+    # Build response with computed fields (user and session already loaded via joinedload)
     result = []
     for comment in comments:
-        user = db.query(models.User).filter(models.User.id == comment.user_id).first()
-
         # Convert to dict and add computed fields
         comment_dict = {
             "id": comment.id,
@@ -665,17 +822,13 @@ async def get_comments(
             "text": comment.text,
             "created_at": comment.created_at,
             "updated_at": comment.updated_at,
-            "username": user.username if user else "Unknown",
+            "username": comment.user.username if comment.user else "Unknown",
             "session_duration": None
         }
 
-        # Add session duration if available
-        if comment.session_id:
-            session = db.query(models.TimeSession).filter(
-                models.TimeSession.id == comment.session_id
-            ).first()
-            if session and session.duration_seconds:
-                comment_dict["session_duration"] = session.duration_seconds
+        # Add session duration if available (already loaded via joinedload)
+        if comment.session and comment.session.duration_seconds:
+            comment_dict["session_duration"] = comment.session.duration_seconds
 
         result.append(comment_dict)
 
@@ -759,17 +912,55 @@ async def get_calendar_sessions(
 ):
     return crud.get_calendar_sessions(db, start_date, end_date)
 
-# WebSocket endpoint
+# WebSocket endpoint with authentication
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    await websocket.accept()
+
     try:
-        while True:
-            data = await websocket.receive_text()
-            # Echo back for now, can add more logic later
-            await websocket.send_text(f"Message received: {data}")
+        # Wait for authentication message (first message must contain token)
+        data = await websocket.receive_text()
+        auth_message = json.loads(data)
+
+        if auth_message.get("type") != "auth" or "token" not in auth_message:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
+            return
+
+        token = auth_message["token"]
+
+        # Verify JWT token
+        try:
+            payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+            username: str = payload.get("sub")
+            if username is None:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+                return
+        except JWTError:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+            return
+
+        # Send authentication success
+        await websocket.send_json({"type": "auth_success", "username": username})
+
+        # Connection authenticated, add to manager
+        manager.active_connections.append(websocket)
+
+        try:
+            while True:
+                data = await websocket.receive_text()
+                # Echo back for now, can add more logic later
+                await websocket.send_text(f"Message received: {data}")
+        except WebSocketDisconnect:
+            manager.disconnect(websocket)
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        # Client disconnected before authentication
+        pass
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}", exc_info=True)
+        try:
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR, reason="Internal error")
+        except:
+            pass
 
 if __name__ == "__main__":
     import uvicorn

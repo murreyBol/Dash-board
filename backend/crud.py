@@ -105,99 +105,133 @@ def delete_task(db: Session, task_id: str):
         raise e
 
 def assign_task(db: Session, task_id: str, user_id: str):
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if db_task:
-        # Create assignment history
-        assignment = models.TaskAssignment(
-            task_id=task_id,
-            user_id=user_id
-        )
-        db.add(assignment)
+    try:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if db_task:
+            # Create assignment history
+            assignment = models.TaskAssignment(
+                task_id=task_id,
+                user_id=user_id
+            )
+            db.add(assignment)
 
-        db_task.assigned_to = user_id
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(db_task)
-    return db_task
+            db_task.assigned_to = user_id
+            db_task.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(db_task)
+        return db_task
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def complete_task(db: Session, task_id: str):
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if db_task:
-        # Calculate total time from all sessions
-        all_sessions = db.query(models.TimeSession).filter(
-            models.TimeSession.task_id == task_id
-        ).all()
-        total_seconds = sum(session.duration_seconds for session in all_sessions if session.duration_seconds)
+    try:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if db_task:
+            # Calculate total time from all sessions
+            all_sessions = db.query(models.TimeSession).filter(
+                models.TimeSession.task_id == task_id
+            ).all()
+            total_seconds = sum(session.duration_seconds for session in all_sessions if session.duration_seconds)
 
-        # Mark task as completed (not archived yet)
-        db_task.status = models.StatusEnum.completed
-        db_task.completed_at = datetime.utcnow()
-        db_task.total_time_seconds = total_seconds
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(db_task)
-    return db_task
+            # Mark task as completed (not archived yet)
+            db_task.status = models.StatusEnum.completed
+            db_task.completed_at = datetime.utcnow()
+            db_task.total_time_seconds = total_seconds
+            db_task.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(db_task)
+        return db_task
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def postpone_task(db: Session, task_id: str, reason: str):
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if db_task:
-        db_task.status = models.StatusEnum.postponed
-        db_task.postponed_reason = reason
-        db_task.postponed_at = datetime.utcnow()
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(db_task)
-    return db_task
+    try:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if db_task:
+            db_task.status = models.StatusEnum.postponed
+            db_task.postponed_reason = reason
+            db_task.postponed_at = datetime.utcnow()
+            db_task.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(db_task)
+        return db_task
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def archive_task(db: Session, task_id: str):
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if db_task:
-        # Check: can only archive completed or postponed tasks
-        if db_task.status not in [models.StatusEnum.completed, models.StatusEnum.postponed]:
-            raise ValueError(f"Cannot archive task with status '{db_task.status}'. Complete or postpone it first.")
-        
-        db_task.status = models.StatusEnum.archived
-        db_task.archived_at = datetime.utcnow()
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(db_task)
-    return db_task
+    try:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if db_task:
+            # Check: can only archive completed or postponed tasks
+            if db_task.status not in [models.StatusEnum.completed, models.StatusEnum.postponed]:
+                raise ValueError(f"Cannot archive task with status '{db_task.status}'. Complete or postpone it first.")
+
+            db_task.status = models.StatusEnum.archived
+            db_task.archived_at = datetime.utcnow()
+            db_task.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(db_task)
+        return db_task
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def get_archived_tasks(db: Session):
     return db.query(models.Task).filter(models.Task.status == models.StatusEnum.archived).all()
 
 # Comment CRUD
 def create_comment(db: Session, task_id: str, user_id: str, comment: schemas.CommentCreate):
-    db_comment = models.Comment(
-        task_id=task_id,
-        user_id=user_id,
-        text=comment.text,
-        session_id=comment.session_id
-    )
-    db.add(db_comment)
-    db.commit()
-    db.refresh(db_comment)
-    return db_comment
-
-def get_comments(db: Session, task_id: str):
-    return db.query(models.Comment).filter(models.Comment.task_id == task_id).all()
-
-def update_comment(db: Session, comment_id: str, comment_update: schemas.CommentUpdate):
-    db_comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
-    if db_comment:
-        db_comment.text = comment_update.text
-        db_comment.updated_at = datetime.utcnow()
+    try:
+        db_comment = models.Comment(
+            task_id=task_id,
+            user_id=user_id,
+            text=comment.text,
+            session_id=comment.session_id
+        )
+        db.add(db_comment)
         db.commit()
         db.refresh(db_comment)
-    return db_comment
+        return db_comment
+    except Exception as e:
+        db.rollback()
+        raise e
+
+def get_comments(db: Session, task_id: str):
+    from sqlalchemy.orm import joinedload
+    return db.query(models.Comment).filter(
+        models.Comment.task_id == task_id
+    ).options(
+        joinedload(models.Comment.user),
+        joinedload(models.Comment.session)
+    ).all()
+
+def update_comment(db: Session, comment_id: str, comment_update: schemas.CommentUpdate):
+    try:
+        db_comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+        if db_comment:
+            db_comment.text = comment_update.text
+            db_comment.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(db_comment)
+        return db_comment
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def delete_comment(db: Session, comment_id: str):
-    db_comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
-    if db_comment:
-        db.delete(db_comment)
-        db.commit()
-        return True
-    return False
+    try:
+        db_comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+        if db_comment:
+            db.delete(db_comment)
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        db.rollback()
+        raise e
 
 # TimeSession CRUD
 def start_timer(db: Session, task_id: str, user_id: str):
@@ -328,22 +362,62 @@ def get_task_last_activity(db: Session, task_id: str) -> Optional[datetime]:
 
 def get_overdue_tasks(db: Session, days_threshold: int = 7):
     """Get tasks with no activity for the specified number of days."""
-    all_tasks = db.query(models.Task).filter(
-        models.Task.status != models.StatusEnum.archived
-    ).all()
+    from sqlalchemy import func, case
 
-    overdue_tasks = []
     now = datetime.utcnow()
 
-    for task in all_tasks:
-        last_activity = get_task_last_activity(db, task.id)
+    # Subquery for latest comment timestamp
+    latest_comment_subq = db.query(
+        models.Comment.task_id,
+        func.max(
+            func.coalesce(models.Comment.updated_at, models.Comment.created_at)
+        ).label('latest_comment_time')
+    ).group_by(models.Comment.task_id).subquery()
+
+    # Subquery for latest session timestamp
+    latest_session_subq = db.query(
+        models.TimeSession.task_id,
+        func.max(
+            func.coalesce(models.TimeSession.ended_at, models.TimeSession.started_at)
+        ).label('latest_session_time')
+    ).group_by(models.TimeSession.task_id).subquery()
+
+    # Main query with computed last_activity and filtering in SQL
+    query = db.query(
+        models.Task,
+        func.greatest(
+            models.Task.updated_at,
+            models.Task.created_at,
+            func.coalesce(latest_comment_subq.c.latest_comment_time, models.Task.created_at),
+            func.coalesce(latest_session_subq.c.latest_session_time, models.Task.created_at)
+        ).label('last_activity')
+    ).outerjoin(
+        latest_comment_subq, models.Task.id == latest_comment_subq.c.task_id
+    ).outerjoin(
+        latest_session_subq, models.Task.id == latest_session_subq.c.task_id
+    ).filter(
+        models.Task.status != models.StatusEnum.archived
+    ).having(
+        func.julianday(now) - func.julianday(
+            func.greatest(
+                models.Task.updated_at,
+                models.Task.created_at,
+                func.coalesce(latest_comment_subq.c.latest_comment_time, models.Task.created_at),
+                func.coalesce(latest_session_subq.c.latest_session_time, models.Task.created_at)
+            )
+        ) >= days_threshold
+    )
+
+    results = query.all()
+
+    overdue_tasks = []
+    for task, last_activity in results:
         if last_activity:
             days_inactive = (now - last_activity).days
-            if days_inactive >= days_threshold:
-                # Add computed fields to task object
-                task.last_activity_at = last_activity
-                task.inactive_days = days_inactive
-                overdue_tasks.append(task)
+            # Add computed fields to task object
+            task.last_activity_at = last_activity
+            task.inactive_days = days_inactive
+            overdue_tasks.append(task)
 
     return overdue_tasks
 

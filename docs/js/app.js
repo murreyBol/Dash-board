@@ -661,6 +661,13 @@ document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
 
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    timer.cleanup();
+    websocket.disconnect();
+    kanban.cleanup();
+});
+
 // Close modals on outside click
 window.onclick = (event) => {
     if (event.target.classList.contains('modal')) {

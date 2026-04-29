@@ -2,10 +2,70 @@ const kanban = {
     tasks: [],
     currentEditingTask: null,
     currentPostponeTask: null,
+    renderTimeout: null,
+    eventHandlers: {
+        click: null,
+        dragstart: null,
+        dragend: null
+    },
 
     async init() {
         await this.loadTasks();
         this.setupDragAndDrop();
+        this.setupEventDelegation();
+    },
+
+    scheduleRender() {
+        if (this.renderTimeout) {
+            clearTimeout(this.renderTimeout);
+        }
+        this.renderTimeout = setTimeout(() => {
+            this.render();
+            this.renderTimeout = null;
+        }, 50);
+    },
+
+    setupEventDelegation() {
+        // Single delegated event listener for all task card interactions
+        this.eventHandlers.click = async (e) => {
+            const target = e.target;
+            const button = target.closest('[data-action]');
+            if (!button) return;
+
+            const card = button.closest('.task-card');
+            if (!card) return;
+
+            const taskId = card.dataset.taskId;
+            const action = button.dataset.action;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            switch (action) {
+                case 'toggle-comments':
+                    await this.toggleComments(taskId);
+                    break;
+                case 'edit':
+                    await this.editTask(taskId);
+                    break;
+                case 'assign':
+                    await this.assignToMe(taskId);
+                    break;
+                case 'toggle-timer':
+                    await this.toggleTimer(taskId);
+                    break;
+                case 'complete':
+                    await this.completeTask(taskId);
+                    break;
+                case 'archive':
+                    await this.archiveTask(taskId);
+                    break;
+                case 'delete':
+                    await this.deleteTask(taskId);
+                    break;
+            }
+        };
+        document.addEventListener('click', this.eventHandlers.click);
     },
 
     async loadTasks() {
@@ -102,7 +162,7 @@ const kanban = {
         card.innerHTML = `
             ${assigneeHtml}
             <div class="task-header">
-                <div class="task-title clickable" onclick="kanban.toggleComments('${task.id}')">
+                <div class="task-title clickable" data-action="toggle-comments">
                     <span class="expand-icon">▶</span> ${this.escapeHtml(task.title)}
                 </div>
                 <div class="task-status">${statusBadges.join('')}</div>
@@ -115,19 +175,19 @@ const kanban = {
                 ${timerHtml}
             </div>
             <div class="task-actions">
-                <button class="btn-edit" onclick="kanban.editTask('${task.id}')">✏️ Редактировать</button>
+                <button class="btn-edit" data-action="edit">✏️ Редактировать</button>
                 ${!task.assigned_to || task.assigned_to !== auth.currentUser.id ?
-                    `<button class="btn-assign" onclick="kanban.assignToMe('${task.id}')">Взять</button>` : ''}
+                    `<button class="btn-assign" data-action="assign">Взять</button>` : ''}
                 ${task.assigned_to === auth.currentUser.id && task.status !== 'completed' ? `
-                    <button class="btn-timer" onclick="kanban.toggleTimer('${task.id}')">
+                    <button class="btn-timer" data-action="toggle-timer">
                         ${isTimerRunning ? '⏸ Стоп' : '▶ Старт'}
                     </button>
                 ` : ''}
                 ${task.status !== 'completed' ?
-                    `<button class="btn-complete" onclick="kanban.completeTask('${task.id}')">✓ Выполнено</button>` : ''}
+                    `<button class="btn-complete" data-action="complete">✓ Выполнено</button>` : ''}
                 ${task.status === 'completed' ?
-                    `<button class="btn-archive" onclick="kanban.archiveTask('${task.id}')">📦 Архив</button>` : ''}
-                <button class="btn-delete" onclick="kanban.deleteTask('${task.id}')">✕</button>
+                    `<button class="btn-archive" data-action="archive">📦 Архив</button>` : ''}
+                <button class="btn-delete" data-action="delete">✕</button>
             </div>
         `;
 
@@ -156,18 +216,21 @@ const kanban = {
             });
         });
 
-        document.addEventListener('dragstart', (e) => {
+        this.eventHandlers.dragstart = (e) => {
             if (e.target.classList.contains('task-card')) {
                 e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
                 e.target.classList.add('dragging');
             }
-        });
+        };
 
-        document.addEventListener('dragend', (e) => {
+        this.eventHandlers.dragend = (e) => {
             if (e.target.classList.contains('task-card')) {
                 e.target.classList.remove('dragging');
             }
-        });
+        };
+
+        document.addEventListener('dragstart', this.eventHandlers.dragstart);
+        document.addEventListener('dragend', this.eventHandlers.dragend);
     },
 
     async updateTaskPriority(taskId, newPriority) {
@@ -275,9 +338,11 @@ const kanban = {
 
     async toggleComments(taskId) {
         const commentsSection = document.getElementById(`comments-${taskId}`);
-        const expandIcon = event.target.closest('.task-title').querySelector('.expand-icon');
+        const card = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (!card || !commentsSection) return;
 
-        if (!commentsSection) return;
+        const expandIcon = card.querySelector('.expand-icon');
+        if (!expandIcon) return;
 
         if (commentsSection.style.display === 'none') {
             // Expand - load and show comments
@@ -357,5 +422,20 @@ const kanban = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    cleanup() {
+        if (this.eventHandlers.click) {
+            document.removeEventListener('click', this.eventHandlers.click);
+        }
+        if (this.eventHandlers.dragstart) {
+            document.removeEventListener('dragstart', this.eventHandlers.dragstart);
+        }
+        if (this.eventHandlers.dragend) {
+            document.removeEventListener('dragend', this.eventHandlers.dragend);
+        }
+        if (this.renderTimeout) {
+            clearTimeout(this.renderTimeout);
+        }
     }
 };
