@@ -57,6 +57,8 @@ class Task(TaskBase):
     archived_at: Optional[datetime] = None
     total_time_seconds: int = 0
 
+    model_config = {"from_attributes": True}
+
 class OverdueTask(Task):
     last_activity_at: datetime
     inactive_days: int
