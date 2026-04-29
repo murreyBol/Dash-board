@@ -1,7 +1,7 @@
 // Auto-detect environment and use appropriate API URL
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8000'
-    : 'https://YOUR-RENDER-APP-NAME.onrender.com';  // Replace with your actual Render URL
+    : 'https://dash-board-egwf.onrender.com';  // Your Render backend URL
 
 const api = {
     baseUrl: API_URL,  // Make API_URL accessible
