@@ -32,7 +32,21 @@ const websocket = {
 
             this.ws.onmessage = (event) => {
                 try {
-                    const message = JSON.parse(event.data);
+                    // Check if message is JSON
+                    if (typeof event.data !== 'string') {
+                        console.warn('WebSocket received non-string message:', event.data);
+                        return;
+                    }
+
+                    // Try to parse as JSON
+                    let message;
+                    try {
+                        message = JSON.parse(event.data);
+                    } catch (parseError) {
+                        // Not JSON, might be a plain text message from server
+                        console.log('WebSocket text message:', event.data);
+                        return;
+                    }
 
                     // Handle authentication success
                     if (message.type === 'auth_success') {
