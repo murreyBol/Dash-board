@@ -4,8 +4,8 @@ services:
     env: python
     region: frankfurt
     plan: free
-    buildCommand: "pip install -r backend/requirements.txt"
-    startCommand: "cd backend && python start.py"
+    buildCommand: "pip install -r task_planner/backend/requirements.txt"
+    startCommand: "bash task_planner/backend/start.sh"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -19,7 +19,7 @@ services:
       - key: SITE_PIN_CODE
         sync: false
       - key: ALLOWED_ORIGINS
-        value: https://yourusername.github.io
+        value: https://murreybol.github.io
       - key: PORT
         value: 8000
 
