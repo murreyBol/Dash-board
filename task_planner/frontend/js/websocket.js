@@ -10,7 +10,10 @@ const websocket = {
         }
 
         try {
-            this.ws = new WebSocket('ws://localhost:8000/ws');
+            const wsUrl = window.location.hostname === 'localhost'
+                ? 'ws://localhost:8000/ws'
+                : 'wss://dash-board-egwf.onrender.com/ws';
+            this.ws = new WebSocket(wsUrl);
 
             this.ws.onopen = () => {
                 console.log('WebSocket connected');

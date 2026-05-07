@@ -1,6 +1,6 @@
 const API_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
-    : 'https://your-backend-app.onrender.com';
+    : 'https://dash-board-egwf.onrender.com';
 
 const api = {
     token: localStorage.getItem('token'),
